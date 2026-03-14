@@ -12,7 +12,7 @@ import time
 # CONFIGURACIÓN DE PÁGINA
 # =====================================================================
 st.set_page_config(
-    page_title="Quant/Sharp Auditor Pro v6.2",
+    page_title="Quant/Sharp Auditor Pro v6.3",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -72,6 +72,7 @@ else:
     # Usamos la nueva clave proporcionada (asegúrate de haberla creado en Google AI Studio)
     GEMINI_API_KEY = "AIzaSyCpeJM5HYnJuzH8YH1OG5lZ4D7BE4bTcTQ"
 
+# MODELO ESTÁNDAR
 MODEL_NAME = "gemini-1.5-flash"
 
 if GEMINI_API_KEY:
@@ -84,7 +85,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 def extract_json(text):
     """Extrae y limpia bloques JSON de una respuesta de texto"""
     try:
-        # Intentar parsear directamente si el texto es JSON puro
+        # Intentar parsear directamente
         return json.loads(text)
     except:
         # Si falla, buscar bloques marcados con markdown o llaves
@@ -119,8 +120,7 @@ def auditar_lote_informes(lista_pdfs, lista_imagenes):
         2. AUDITORÍA FASE 2: Compara la Simulación del PDF contra los resultados reales de la imagen.
         3. MÉTRICAS EXHAUSTIVAS: Extrae Goles, Corners, Tarjetas, Posesión, Tiros al arco y Penales.
         
-        [REGLA] RESPONDE EXCLUSIVAMENTE CON UNA LISTA DE OBJETOS JSON. 
-        Asegúrate de que todos los nombres de propiedades estén entre comillas dobles.
+        [REGLA] RESPONDE EXCLUSIVAMENTE CON UNA LISTA DE OBJETOS JSON.
         
         Formato de salida requerido:
         [
@@ -183,10 +183,28 @@ def auditar_apuesta_maestra(texto_master, img_real_master):
 # INTERFAZ DE USUARIO
 # =====================================================================
 st.title("🎯 Quant/Sharp Auditor Pro")
-st.markdown(f"Protocolo de Seguridad v6.2 - Flujo Franco-Tirador Activo")
+st.markdown(f"Protocolo de Seguridad v6.3 - Flujo Franco-Tirador Activo")
 
-if not GEMINI_API_KEY:
-    st.error("⚠️ **API Key no configurada.** Por favor, agrégala en los Secrets de Streamlit.")
+# --- BARRA LATERAL DIAGNÓSTICA ---
+with st.sidebar:
+    st.header("⚙️ Estado del Sistema")
+    if GEMINI_API_KEY:
+        st.success("API Key cargada")
+        if st.button("🔍 Test de Conexión"):
+            try:
+                models = [m.name for m in genai.list_models()]
+                st.write("Modelos Disponibles:", models)
+                if f"models/{MODEL_NAME}" in models or MODEL_NAME in models:
+                    st.success(f"Modelo {MODEL_NAME} detectado ✅")
+                else:
+                    st.warning(f"Aviso: {MODEL_NAME} no aparece en la lista.")
+            except Exception as test_err:
+                st.error(f"Error de test: {test_err}")
+    else:
+        st.error("Falta API Key")
+    
+    st.divider()
+    st.caption("Quant/Sharp v6.3 | Auditoría Inteligente")
 
 tab1, tab2, tab3 = st.tabs(["📄 AUDITORÍA POR LOTES (P1)", "🛡️ APUESTA MAESTRA (P2)", "📊 PANEL DE CONTROL"])
 
@@ -210,12 +228,10 @@ with tab1:
                 start_time = time.time()
                 res_text = auditar_lote_informes(pdfs_batch, imgs_batch)
                 
-                # Intentar interpretar los datos directamente con la nueva función robusta
                 datos_interpretados = extract_json(res_text)
                 
                 if datos_interpretados:
                     try:
-                        # Convertir a lista si es un solo objeto
                         if isinstance(datos_interpretados, dict):
                             resultados_lista = [datos_interpretados]
                         else:
@@ -294,5 +310,3 @@ with tab3:
             st.info("Sin registros en la base de datos.")
     except Exception as e:
         st.error(f"Error de conexión con Supabase: {e}")
-
-st.sidebar.caption("Quant/Sharp v6.2 | Franco-Tirador Workflow")
