@@ -12,13 +12,13 @@ import time
 # CONFIGURACIÓN DE PÁGINA
 # =====================================================================
 st.set_page_config(
-    page_title="Quant/Sharp Auditor Pro v6.0",
+    page_title="Quant/Sharp Auditor Pro v6.1",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# --- ESTILOS CSS PERSONALIZADOS (LOOK PREMIUM + ANIMACIÓN DE CARGA) ---
+# --- ESTILOS CSS PERSONALIZADOS ---
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
@@ -37,7 +37,6 @@ st.markdown("""
         font-weight: bold;
         border: none;
     }
-    /* Animación de pulso para la carga */
     @keyframes pulse {
         0% { opacity: 1; }
         50% { opacity: 0.5; }
@@ -66,16 +65,18 @@ st.markdown("""
 SUPABASE_URL = "https://tnxhmhoczcbfmhieaxgt.supabase.co"
 SUPABASE_KEY = "sb_publishable_4SX3y_184dNOObMxbRTIYA_3qSbfYUt"
 
-# Prioridad a Secrets de Streamlit, luego hardcoded para pruebas
+# CONFIGURACIÓN DE SEGURIDAD ACTUALIZADA
+# Intentamos obtener la clave de los Secrets (Recomendado para Streamlit Cloud)
 if "GEMINI_API_KEY" in st.secrets:
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 else:
-    GEMINI_API_KEY = "AIzaSyDkjIDZOMeISbINKYV6qprTFuW_GWpCvqU"
+    # Usamos la nueva clave proporcionada
+    GEMINI_API_KEY = "AIzaSyCpeJM5HYnJuzH8YH1OG5lZ4D7BE4bTcTQ"
 
-# USAR EL NOMBRE DE RECURSO COMPLETO
 MODEL_NAME = "models/gemini-1.5-flash"
 
-genai.configure(api_key=GEMINI_API_KEY)
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # =====================================================================
@@ -95,15 +96,18 @@ def extract_json(text):
 # MOTOR DE IA - CRUCE DE DATOS
 # =====================================================================
 def auditar_lote_informes(lista_pdfs, lista_imagenes):
+    if not GEMINI_API_KEY:
+        return "Error: No se ha configurado la clave de API de Gemini."
+    
     try:
         model = genai.GenerativeModel(MODEL_NAME)
         
         prompt = """
-        [ROL] Auditor Jefe de Datos Deportivos.
+        [ROL] Auditor Jefe de Datos Deportivos Pro.
         [TAREA]
         1. EMPAREJAMIENTO: Identifica qué imagen corresponde a qué PDF basándote en los nombres de los equipos.
-        2. AUDITORÍA: Compara la Fase 2 (Simulación) del PDF contra los resultados reales de la imagen.
-        3. MÉTRICAS: Extrae Goles, Corners, Tarjetas, Posesión, Tiros al arco y Penales.
+        2. AUDITORÍA FASE 2: Compara la Simulación del PDF contra los resultados reales de la imagen.
+        3. MÉTRICAS EXHAUSTIVAS: Extrae Goles, Corners, Tarjetas, Posesión, Tiros al arco y Penales.
         
         [REGLA] RESPONDE EXCLUSIVAMENTE CON UNA LISTA JSON.
         
@@ -118,10 +122,10 @@ def auditar_lote_informes(lista_pdfs, lista_imagenes):
             "tarjetas": int,
             "posesion": "XX%",
             "estado": "🟢 (Acierto) o 🔴 (Fallo)",
-            "sim_goles": "Rango proyectado",
-            "sim_corners": "Rango proyectado",
+            "sim_goles": "Rango proyectado Fase 2",
+            "sim_corners": "Rango proyectado Fase 2",
             "exactitud_sim": "XX%",
-            "analisis_tecnico": "Tabla comparativa Markdown",
+            "analisis_tecnico": "Tabla comparativa Markdown de todas las estadísticas",
             "tipo": "Individual"
           }
         ]
@@ -139,6 +143,9 @@ def auditar_lote_informes(lista_pdfs, lista_imagenes):
         return f"Error en la llamada al modelo: {str(e)}"
 
 def auditar_apuesta_maestra(texto_master, img_real_master):
+    if not GEMINI_API_KEY:
+        return "Error: API Key de Gemini no encontrada."
+
     try:
         model = genai.GenerativeModel(MODEL_NAME)
         
@@ -159,12 +166,15 @@ def auditar_apuesta_maestra(texto_master, img_real_master):
 # INTERFAZ DE USUARIO
 # =====================================================================
 st.title("🎯 Quant/Sharp Auditor Pro")
-st.markdown("Protocolo de Seguridad v6.0 - Sistema de Auditoría Autónoma")
+st.markdown(f"Protocolo de Seguridad v6.1 - Flujo Franco-Tirador Activo")
+
+if not GEMINI_API_KEY:
+    st.error("⚠️ **API Key no configurada.** Por favor, agrégala en los Secrets de Streamlit.")
 
 tab1, tab2, tab3 = st.tabs(["📄 AUDITORÍA POR LOTES (P1)", "🛡️ APUESTA MAESTRA (P2)", "📊 PANEL DE CONTROL"])
 
 with tab1:
-    st.subheader("Fase 1: Control de Calidad de Simulaciones")
+    st.subheader("Fase 1: Auditoría de Informes Individuales")
     st.info("Sube tus informes PDF y las imágenes de resultados para el emparejamiento automático.")
     
     col_a, col_b = st.columns(2)
@@ -174,9 +184,11 @@ with tab1:
         imgs_batch = st.file_uploader("Subir Imágenes de Resultados", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="up_imgs")
     
     if st.button("▶ INICIAR AUDITORÍA POR LOTE"):
-        if pdfs_batch and imgs_batch:
-            with st.status("🚀 Procesando auditoría...", expanded=True) as status:
-                st.markdown('<p class="loading-text">🧠 La IA está analizando y emparejando archivos...</p>', unsafe_allow_html=True)
+        if not GEMINI_API_KEY:
+            st.error("Falta API Key.")
+        elif pdfs_batch and imgs_batch:
+            with st.status("🚀 Analizando partidos...", expanded=True) as status:
+                st.markdown('<p class="loading-text">🧠 La IA está cruzando datos de Simulación vs Realidad...</p>', unsafe_allow_html=True)
                 
                 start_time = time.time()
                 res_text = auditar_lote_informes(pdfs_batch, imgs_batch)
@@ -200,33 +212,27 @@ with tab1:
                             with st.expander(f"Resultado: {r['partido']} - {r['estado']}"):
                                 st.markdown(r['analisis_tecnico'])
                     except Exception as e:
-                        st.error(f"Error al interpretar los datos: {e}")
+                        st.error(f"Error al interpretar datos: {e}")
                 else:
-                    status.update(label="❌ Fallo en la extracción", state="error")
-                    st.error("No se pudo obtener una respuesta válida del modelo.")
-                    with st.expander("Ver respuesta de la IA (Depuración)"):
+                    status.update(label="❌ Error de procesamiento", state="error")
+                    st.error("No se pudo obtener una respuesta válida. Verifica la calidad de los archivos.")
+                    with st.expander("Ver respuesta técnica (Depuración)"):
                         st.write(res_text)
-                        # Intento de diagnóstico profundo
-                        try:
-                            st.write("Verificando modelos disponibles con tu API Key...")
-                            models = [m.name for m in genai.list_models()]
-                            st.write("Modelos encontrados:", models)
-                        except Exception as list_err:
-                            st.error(f"No se pudo validar la API Key: {list_err}")
         else:
             st.warning("Debes cargar al menos un PDF y una Imagen.")
 
 with tab2:
-    st.subheader("Fase 2: Validación del Veredicto Final")
+    st.subheader("Fase 2: Validación de Apuesta Maestra")
     col_m1, col_m2 = st.columns([1, 1])
     with col_m1:
-        m_text = st.text_area("Texto del Franco-Tirador", height=250)
+        m_text = st.text_area("Resultado del Prompt 2 (Texto)", height=250)
     with col_m2:
-        m_img = st.file_uploader("Estadísticas del Partido Maestro", type=["jpg", "png", "jpeg"], key="up_m")
+        m_img = st.file_uploader("Captura de Estadísticas Finales", type=["jpg", "png", "jpeg"], key="up_m")
     
     if st.button("▶ VALIDAR APUESTA MAESTRA"):
         if m_text and m_img:
-            with st.status("🔍 Verificando selección maestra...", expanded=True) as status:
+            with st.status("🔍 Validando selección del Franco-Tirador...", expanded=True) as status:
+                st.markdown('<p class="loading-text">🎯 Verificando si se protegió el capital...</p>', unsafe_allow_html=True)
                 res = auditar_apuesta_maestra(m_text, m_img)
                 j_str = extract_json(res)
                 if j_str:
@@ -236,7 +242,7 @@ with tab2:
                     st.balloons()
                     st.markdown(re.sub(r'```json.*?```', '', res, flags=re.DOTALL))
                 else:
-                    st.error("Error de formato.")
+                    st.error("Error de formato en la respuesta.")
                     st.code(res)
 
 with tab3:
@@ -253,14 +259,14 @@ with tab3:
             k1.metric("Análisis", len(df_view))
             hits = len(df_view[df_view['estado'].str.contains('🟢')])
             k2.metric("Acierto %", f"{(hits/len(df_view)*100 if len(df_view)>0 else 0):.1f}%")
-            k3.metric("Status", "🛡️ Protegido" if hits > 0 else "⚖️ Estable")
+            k3.metric("Estatus", "🛡️ Protegido" if win_rate > 65 else "⚖️ Estable")
 
-            st.plotly_chart(px.pie(df_view, names='estado', hole=0.5, title="Distribución"), use_container_width=True)
+            st.plotly_chart(px.pie(df_view, names='estado', hole=0.5, title="Distribución de Resultados"), use_container_width=True)
             st.subheader("Historial Completo")
             st.dataframe(df_view[['fecha', 'partido', 'pronostico', 'estado', 'tipo', 'analisis_tecnico']], use_container_width=True, hide_index=True)
         else:
-            st.info("Sin registros.")
+            st.info("Sin registros en la base de datos.")
     except Exception as e:
-        st.error(f"Error de base de datos: {e}")
+        st.error(f"Error de conexión con Supabase: {e}")
 
-st.sidebar.caption("Quant/Sharp v6.0 | Franco-Tirador Workflow")
+st.sidebar.caption("Quant/Sharp v6.1 | Franco-Tirador Workflow")
