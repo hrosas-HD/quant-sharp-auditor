@@ -12,7 +12,7 @@ import time
 # CONFIGURACIÓN DE PÁGINA
 # =====================================================================
 st.set_page_config(
-    page_title="Quant/Sharp Auditor Pro v6.1",
+    page_title="Quant/Sharp Auditor Pro v6.2",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -66,14 +66,13 @@ SUPABASE_URL = "https://tnxhmhoczcbfmhieaxgt.supabase.co"
 SUPABASE_KEY = "sb_publishable_4SX3y_184dNOObMxbRTIYA_3qSbfYUt"
 
 # CONFIGURACIÓN DE SEGURIDAD ACTUALIZADA
-# Intentamos obtener la clave de los Secrets (Recomendado para Streamlit Cloud)
 if "GEMINI_API_KEY" in st.secrets:
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 else:
-    # Usamos la nueva clave proporcionada
+    # Usamos la nueva clave proporcionada (asegúrate de haberla creado en Google AI Studio)
     GEMINI_API_KEY = "AIzaSyCpeJM5HYnJuzH8YH1OG5lZ4D7BE4bTcTQ"
 
-MODEL_NAME = "models/gemini-1.5-flash"
+MODEL_NAME = "gemini-1.5-flash"
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
@@ -83,13 +82,20 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # FUNCIONES AUXILIARES
 # =====================================================================
 def extract_json(text):
-    """Extrae bloques JSON de una respuesta de texto"""
-    list_match = re.search(r'\[\s*\{.*\}\s*\]', text, re.DOTALL)
-    if list_match:
-        return list_match.group()
-    obj_match = re.search(r'\{.*\}', text, re.DOTALL)
-    if obj_match:
-        return obj_match.group()
+    """Extrae y limpia bloques JSON de una respuesta de texto"""
+    try:
+        # Intentar parsear directamente si el texto es JSON puro
+        return json.loads(text)
+    except:
+        # Si falla, buscar bloques marcados con markdown o llaves
+        list_match = re.search(r'\[\s*\{.*\}\s*\]', text, re.DOTALL)
+        if list_match:
+            try: return json.loads(list_match.group())
+            except: pass
+        obj_match = re.search(r'\{.*\}', text, re.DOTALL)
+        if obj_match:
+            try: return json.loads(obj_match.group())
+            except: pass
     return None
 
 # =====================================================================
@@ -100,7 +106,11 @@ def auditar_lote_informes(lista_pdfs, lista_imagenes):
         return "Error: No se ha configurado la clave de API de Gemini."
     
     try:
-        model = genai.GenerativeModel(MODEL_NAME)
+        # Configuración para forzar salida JSON válida
+        model = genai.GenerativeModel(
+            model_name=MODEL_NAME,
+            generation_config={"response_mime_type": "application/json"}
+        )
         
         prompt = """
         [ROL] Auditor Jefe de Datos Deportivos Pro.
@@ -109,9 +119,10 @@ def auditar_lote_informes(lista_pdfs, lista_imagenes):
         2. AUDITORÍA FASE 2: Compara la Simulación del PDF contra los resultados reales de la imagen.
         3. MÉTRICAS EXHAUSTIVAS: Extrae Goles, Corners, Tarjetas, Posesión, Tiros al arco y Penales.
         
-        [REGLA] RESPONDE EXCLUSIVAMENTE CON UNA LISTA JSON.
+        [REGLA] RESPONDE EXCLUSIVAMENTE CON UNA LISTA DE OBJETOS JSON. 
+        Asegúrate de que todos los nombres de propiedades estén entre comillas dobles.
         
-        Formato:
+        Formato de salida requerido:
         [
           {
             "partido": "Nombre exacto",
@@ -147,13 +158,19 @@ def auditar_apuesta_maestra(texto_master, img_real_master):
         return "Error: API Key de Gemini no encontrada."
 
     try:
-        model = genai.GenerativeModel(MODEL_NAME)
+        model = genai.GenerativeModel(
+            model_name=MODEL_NAME,
+            generation_config={"response_mime_type": "application/json"}
+        )
         
         prompt = f"""
         [ROL] Auditor Jefe de Riesgos (FRANCO-TIRADOR v5.0).
         [PRONÓSTICO]: {texto_master}
         [TAREA] Verifica 'APUESTA MAESTRA' y 'RECOMENDACIÓN SECUNDARIA' contra la imagen real.
-        [REGLA] RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON.
+        [REGLA] RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO.
+        
+        Formato:
+        {{"partido": "text", "pronostico": "Mercado", "marcador_final": "text", "goles_totales": int, "corners": int, "tarjetas": int, "posesion": "text", "estado": "🟢 o 🔴", "sim_goles": "N/A", "sim_corners": "N/A", "exactitud_sim": "100% o 0%", "analisis_tecnico": "Análisis", "tipo": "Maestra"}}
         """
         
         partes = [prompt, {"mime_type": "image/png", "data": img_real_master.getvalue()}]
@@ -166,7 +183,7 @@ def auditar_apuesta_maestra(texto_master, img_real_master):
 # INTERFAZ DE USUARIO
 # =====================================================================
 st.title("🎯 Quant/Sharp Auditor Pro")
-st.markdown(f"Protocolo de Seguridad v6.1 - Flujo Franco-Tirador Activo")
+st.markdown(f"Protocolo de Seguridad v6.2 - Flujo Franco-Tirador Activo")
 
 if not GEMINI_API_KEY:
     st.error("⚠️ **API Key no configurada.** Por favor, agrégala en los Secrets de Streamlit.")
@@ -193,13 +210,16 @@ with tab1:
                 start_time = time.time()
                 res_text = auditar_lote_informes(pdfs_batch, imgs_batch)
                 
-                json_str = extract_json(res_text)
+                # Intentar interpretar los datos directamente con la nueva función robusta
+                datos_interpretados = extract_json(res_text)
                 
-                if json_str:
+                if datos_interpretados:
                     try:
-                        resultados_lista = json.loads(json_str)
-                        if isinstance(resultados_lista, dict):
-                            resultados_lista = [resultados_lista]
+                        # Convertir a lista si es un solo objeto
+                        if isinstance(datos_interpretados, dict):
+                            resultados_lista = [datos_interpretados]
+                        else:
+                            resultados_lista = datos_interpretados
                             
                         for item in resultados_lista:
                             supabase.table("auditoria_apuestas").insert(item).execute()
@@ -212,10 +232,10 @@ with tab1:
                             with st.expander(f"Resultado: {r['partido']} - {r['estado']}"):
                                 st.markdown(r['analisis_tecnico'])
                     except Exception as e:
-                        st.error(f"Error al interpretar datos: {e}")
+                        st.error(f"Error al guardar datos en Supabase: {e}")
                 else:
-                    status.update(label="❌ Error de procesamiento", state="error")
-                    st.error("No se pudo obtener una respuesta válida. Verifica la calidad de los archivos.")
+                    status.update(label="❌ Error de formato JSON", state="error")
+                    st.error("La IA devolvió datos en un formato que no pudo ser procesado automáticamente.")
                     with st.expander("Ver respuesta técnica (Depuración)"):
                         st.write(res_text)
         else:
@@ -234,16 +254,21 @@ with tab2:
             with st.status("🔍 Validando selección del Franco-Tirador...", expanded=True) as status:
                 st.markdown('<p class="loading-text">🎯 Verificando si se protegió el capital...</p>', unsafe_allow_html=True)
                 res = auditar_apuesta_maestra(m_text, m_img)
-                j_str = extract_json(res)
-                if j_str:
-                    data = json.loads(j_str)
-                    supabase.table("auditoria_apuestas").insert(data).execute()
-                    status.update(label="✅ Apuesta Maestra Validada", state="complete")
-                    st.balloons()
-                    st.markdown(re.sub(r'```json.*?```', '', res, flags=re.DOTALL))
+                
+                datos_maestros = extract_json(res)
+                if datos_maestros:
+                    try:
+                        supabase.table("auditoria_apuestas").insert(datos_maestros).execute()
+                        status.update(label="✅ Apuesta Maestra Validada", state="complete")
+                        st.balloons()
+                        st.markdown("### Reporte Final de Apuesta Maestra")
+                        st.markdown(datos_maestros.get("analisis_tecnico", "Sin detalles adicionales."))
+                    except Exception as e:
+                        st.error(f"Error al guardar en Supabase: {e}")
                 else:
-                    st.error("Error de formato en la respuesta.")
-                    st.code(res)
+                    st.error("Error de formato en la respuesta de la IA.")
+                    with st.expander("Depuración"):
+                        st.code(res)
 
 with tab3:
     try:
@@ -258,7 +283,8 @@ with tab3:
             k1, k2, k3 = st.columns(3)
             k1.metric("Análisis", len(df_view))
             hits = len(df_view[df_view['estado'].str.contains('🟢')])
-            k2.metric("Acierto %", f"{(hits/len(df_view)*100 if len(df_view)>0 else 0):.1f}%")
+            win_rate = (hits/len(df_view)*100 if len(df_view)>0 else 0)
+            k2.metric("Acierto %", f"{win_rate:.1f}%")
             k3.metric("Estatus", "🛡️ Protegido" if win_rate > 65 else "⚖️ Estable")
 
             st.plotly_chart(px.pie(df_view, names='estado', hole=0.5, title="Distribución de Resultados"), use_container_width=True)
@@ -269,4 +295,4 @@ with tab3:
     except Exception as e:
         st.error(f"Error de conexión con Supabase: {e}")
 
-st.sidebar.caption("Quant/Sharp v6.1 | Franco-Tirador Workflow")
+st.sidebar.caption("Quant/Sharp v6.2 | Franco-Tirador Workflow")
