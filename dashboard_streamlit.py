@@ -7,12 +7,13 @@ import google.generativeai as genai
 import re
 import json
 import time
+import random
 
 # =====================================================================
 # CONFIGURACIÓN DE PÁGINA
 # =====================================================================
 st.set_page_config(
-    page_title="Quant/Sharp Auditor Pro v6.6",
+    page_title="Quant/Sharp Auditor Pro v6.7",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -77,63 +78,59 @@ else:
 with st.sidebar:
     st.header("⚙️ Configuración Pro")
     
-    # Lista de modelos proporcionada por el usuario
     model_list = [
         "gemini-1.5-flash",
         "gemini-1.5-pro",
         "gemini-2.0-flash",
-        "gemini-2.0-flash-001",
-        "gemini-2.0-flash-lite-001",
-        "gemini-2.0-flash-lite",
         "gemini-flash-latest",
-        "gemini-flash-lite-latest",
-        "gemini-pro-latest",
-        "gemini-2.5-flash",
-        "gemini-2.5-pro"
+        "gemini-pro-latest"
     ]
     
-    # Selector de modelo para depuración de error 404
     selected_model = st.selectbox(
         "Seleccionar Motor de IA:",
         options=model_list,
-        index=0,
-        help="Si recibes un error 404, prueba cambiando el modelo. 'gemini-1.5-flash' o 'gemini-flash-latest' suelen ser los más estables."
+        index=0
     )
     
     MODEL_NAME = selected_model
 
     if GEMINI_API_KEY and len(GEMINI_API_KEY) > 10:
         st.success("API Key cargada ✅")
-        if st.button("🔍 Test de Conexión"):
-            try:
-                genai.configure(api_key=GEMINI_API_KEY)
-                models = [m.name for m in genai.list_models()]
-                st.write("Modelos en tu Key:", [m.split('/')[-1] for m in models])
-                if any(MODEL_NAME in m for m in models):
-                    st.success(f"Modelo {MODEL_NAME} detectado ✅")
-                else:
-                    st.error(f"El modelo {MODEL_NAME} no aparece en tu lista.")
-            except Exception as e:
-                st.error(f"Error de validación: {e}")
     else:
-        st.error("API Key no válida o ausente")
+        st.error("API Key ausente")
     
     st.divider()
-    st.caption("Quant/Sharp v6.6 | Auditoría Inteligente")
+    st.caption("Quant/Sharp v6.7 | Auditoría Inteligente")
 
-# Inicialización de Gemini y Supabase
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # =====================================================================
-# FUNCIONES AUXILIARES
+# FUNCIONES DE LLAMADA CON REINTENTOS (BACKOFF)
 # =====================================================================
+def call_gemini_with_retry(model, parts, max_retries=5):
+    """Ejecuta la llamada a Gemini con reintentos exponenciales para errores 429"""
+    for i in range(max_retries):
+        try:
+            response = model.generate_content(parts)
+            return response.text, None
+        except Exception as e:
+            err_msg = str(e)
+            if "429" in err_msg:
+                wait_time = (2 ** i) + (random.randint(0, 1000) / 1000)
+                time.sleep(wait_time)
+                continue
+            return None, err_msg
+    return None, "Límite de cuota excedido tras varios reintentos (429)."
+
 def clean_json_response(text):
     """Limpia y extrae JSON de la respuesta de la IA"""
     if not text: return None
     try:
-        return json.loads(text)
+        # Limpiar posibles caracteres invisibles o decoradores markdown
+        clean_text = text.strip().replace("```json", "").replace("```", "")
+        return json.loads(clean_text)
     except:
         match = re.search(r'\[\s*\{.*\}\s*\]|\{.*\}', text, re.DOTALL)
         if match:
@@ -146,7 +143,7 @@ def clean_json_response(text):
 # =====================================================================
 def auditar_lote_informes(lista_pdfs, lista_imagenes):
     if not GEMINI_API_KEY:
-        return "Error: API Key no configurada."
+        return None, "Error: API Key no configurada."
     
     try:
         model = genai.GenerativeModel(
@@ -161,8 +158,7 @@ def auditar_lote_informes(lista_pdfs, lista_imagenes):
         2. AUDITORÍA FASE 2: Compara la Simulación del PDF contra los resultados reales de la imagen.
         3. MÉTRICAS: Extrae Goles, Corners, Tarjetas, Posesión, Tiros al arco y Penales.
         
-        [REGLA] RESPONDE EXCLUSIVAMENTE CON UNA LISTA DE OBJETOS JSON. 
-        Sigue este formato exacto:
+        [REGLA] RESPONDE EXCLUSIVAMENTE CON UNA LISTA DE OBJETOS JSON.
         [
           {
             "partido": "Nombre exacto",
@@ -188,14 +184,13 @@ def auditar_lote_informes(lista_pdfs, lista_imagenes):
         for img in lista_imagenes:
             partes_contenido.append({"mime_type": "image/png", "data": img.getvalue()})
 
-        response = model.generate_content(partes_contenido)
-        return response.text
+        return call_gemini_with_retry(model, partes_contenido)
     except Exception as e:
-        return f"Error en la llamada al modelo ({MODEL_NAME}): {str(e)}"
+        return None, f"Error crítico: {str(e)}"
 
 def auditar_apuesta_maestra(texto_master, img_real_master):
     if not GEMINI_API_KEY:
-        return "Error: API Key no configurada."
+        return None, "Error: API Key no configurada."
 
     try:
         model = genai.GenerativeModel(
@@ -208,7 +203,6 @@ def auditar_apuesta_maestra(texto_master, img_real_master):
         [PRONÓSTICO]: {texto_master}
         [TAREA] Verifica 'APUESTA MAESTRA' y 'RECOMENDACIÓN SECUNDARIA' contra la imagen real.
         [REGLA] RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON VÁLIDO.
-        
         {{
           "partido": "text", 
           "pronostico": "Mercado", 
@@ -227,16 +221,15 @@ def auditar_apuesta_maestra(texto_master, img_real_master):
         """
         
         partes = [prompt, {"mime_type": "image/png", "data": img_real_master.getvalue()}]
-        response = model.generate_content(partes)
-        return response.text
+        return call_gemini_with_retry(model, partes)
     except Exception as e:
-        return f"Error en la llamada al modelo ({MODEL_NAME}): {str(e)}"
+        return None, f"Error crítico: {str(e)}"
 
 # =====================================================================
 # INTERFAZ DE USUARIO
 # =====================================================================
 st.title("🎯 Quant/Sharp Auditor Pro")
-st.markdown(f"Protocolo de Seguridad v6.6 - Motor: **{MODEL_NAME}**")
+st.markdown(f"Protocolo de Seguridad v6.7 - Motor: **{MODEL_NAME}**")
 
 tab1, tab2, tab3 = st.tabs(["📄 AUDITORÍA POR LOTES (P1)", "🛡️ APUESTA MAESTRA (P2)", "📊 PANEL DE CONTROL"])
 
@@ -253,14 +246,14 @@ with tab1:
     if st.button("▶ INICIAR AUDITORÍA POR LOTE"):
         if pdfs_batch and imgs_batch:
             with st.status("🚀 Analizando partidos...", expanded=True) as status:
-                st.markdown(f'<p class="loading-text">🧠 Usando {MODEL_NAME} para cruzar Simulación vs Realidad...</p>', unsafe_allow_html=True)
+                st.markdown(f'<p class="loading-text">🧠 Usando {MODEL_NAME} con reintentos automáticos...</p>', unsafe_allow_html=True)
                 
                 start_time = time.time()
-                res_raw = auditar_lote_informes(pdfs_batch, imgs_batch)
+                res_raw, err = auditar_lote_informes(pdfs_batch, imgs_batch)
                 
-                if "Error" in res_raw:
+                if err:
                     status.update(label="❌ Error de API", state="error")
-                    st.error(res_raw)
+                    st.error(err)
                 else:
                     datos = clean_json_response(res_raw)
                     if datos:
@@ -279,8 +272,8 @@ with tab1:
                         except Exception as e:
                             st.error(f"Error al guardar datos: {e}")
                     else:
-                        status.update(label="❌ Fallo de formato", state="error")
-                        st.error("La IA no devolvió un JSON válido.")
+                        status.update(label="❌ Fallo de formato JSON", state="error")
+                        st.error("La IA devolvió datos en un formato inválido.")
                         with st.expander("Ver respuesta técnica"):
                             st.code(res_raw)
         else:
@@ -297,10 +290,12 @@ with tab2:
     if st.button("▶ VALIDAR APUESTA MAESTRA"):
         if m_text and m_img:
             with st.status("🔍 Verificando selección...", expanded=True) as status:
-                st.markdown(f'<p class="loading-text">🎯 Usando {MODEL_NAME} para verificar riesgo...</p>', unsafe_allow_html=True)
-                res_raw = auditar_apuesta_maestra(m_text, m_img)
-                if "Error" in res_raw:
-                    st.error(res_raw)
+                st.markdown(f'<p class="loading-text">🎯 Consultando motor {MODEL_NAME}...</p>', unsafe_allow_html=True)
+                res_raw, err = auditar_apuesta_maestra(m_text, m_img)
+                
+                if err:
+                    status.update(label="❌ Error de API", state="error")
+                    st.error(err)
                 else:
                     datos_m = clean_json_response(res_raw)
                     if datos_m:
