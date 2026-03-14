@@ -67,12 +67,38 @@ def auditar_informe_individual(pdf_sim, img_real):
         real_parts = [{"mime_type": "image/jpeg", "data": img_real.getvalue()}]
 
         prompt = """
-        [ROL] Auditor de Simulación.
-        [TAREA] Analiza el PDF (Fase 2) y compáralo con la Imagen Real.
-        Determina si los rangos de goles/corners se cumplieron y la calidad del análisis del Prompt 1.
+        [ROL] Auditor de Simulación Pro (Fase 2 vs Realidad).
+        [TAREA] Analiza la FASE 2 del PDF (Simulación) y compárala con las estadísticas reales de la Imagen.
+        
+        [MÉTRICAS A EXTRAER Y COMPARAR]
+        Extrae obligatoriamente estos datos de AMBAS fuentes (si están disponibles):
+        1. Goles (Marcador).
+        2. Tiros de Esquina (Corners).
+        3. Tarjetas (Amarillas/Rojas).
+        4. Posesión de Balón (%).
+        5. Tiros al Arco (Shots on Target).
+        6. Penales (Concedidos/Anotados).
+        
+        [ANÁLISIS]
+        - Compara los rangos proyectados en la simulación contra el dato real exacto.
+        - Evalúa si el análisis del Prompt 1 fue acertado en su lectura de la dinámica del partido.
         
         Devuelve un JSON:
-        {"partido": "text", "pronostico": "Recomendaciones PDF", "marcador_final": "text", "goles_totales": int, "corners": int, "tarjetas": int, "posesion": "text", "estado": "🟢/🔴", "sim_goles": "rango proyectado", "sim_corners": "rango proyectado", "exactitud_sim": "text %", "analisis_tecnico": "text", "tipo": "Individual"}
+        {
+          "partido": "Nombre de los equipos",
+          "pronostico": "Resumen de recomendaciones del informe PDF",
+          "marcador_final": "Resultado final",
+          "goles_totales": int,
+          "corners": int,
+          "tarjetas": int,
+          "posesion": "text %",
+          "estado": "🟢 (Simulación acertada) / 🔴 (Desviación crítica)",
+          "sim_goles": "Rango proyectado en Fase 2",
+          "sim_corners": "Rango proyectado en Fase 2",
+          "exactitud_sim": "Cálculo técnico de precisión %",
+          "analisis_tecnico": "Tabla comparativa Markdown detallada: Goles, Corners, Tarjetas, Posesión, Tiros al arco y Penales (Simulado vs Real)",
+          "tipo": "Individual"
+        }
         """
         response = model.generate_content([*pdf_parts, *real_parts, prompt])
         return response.text
@@ -92,13 +118,13 @@ def auditar_apuesta_maestra(texto_master, img_real_master):
         [TAREA] 
         1. Identifica 'LA APUESTA MAESTRA' y su mercado.
         2. Identifica la 'RECOMENDACIÓN SECUNDARIA (CÓRNERS)'.
-        3. Contrasta AMBAS selecciones con la Imagen Real.
+        3. Contrasta AMBAS selecciones con la Imagen Real (Goles, Corners, Tarjetas, Tiros al arco, Penales).
         
         [VERDICTO]
-        Determina si la Apuesta Maestra fue ganada. Menciona también si el mercado de corners se acertó.
+        Determina si la Apuesta Maestra fue ganada. Menciona también si el mercado de corners se acertó y si la lectura de seguridad fue correcta frente a las estadísticas reales.
         
         Devuelve un JSON:
-        {"partido": "text (Partido de Apuesta Maestra)", "pronostico": "Mercado Apuesta Maestra", "marcador_final": "text", "goles_totales": int, "corners": int, "tarjetas": int, "posesion": "text", "estado": "🟢 (Ganada) / 🔴 (Perdida)", "sim_goles": "N/A", "sim_corners": "N/A", "exactitud_sim": "100% o 0%", "analisis_tecnico": "Resumen de acierto de Maestra + Córners secundarios", "tipo": "Maestra"}
+        {"partido": "text", "pronostico": "Mercado Apuesta Maestra", "marcador_final": "text", "goles_totales": int, "corners": int, "tarjetas": int, "posesion": "text", "estado": "🟢 (Ganada) / 🔴 (Perdida)", "sim_goles": "N/A", "sim_corners": "N/A", "exactitud_sim": "100% o 0%", "analisis_tecnico": "Resumen de acierto de Maestra + Córners. Comparativa de estadísticas clave (Tiros, Penales, etc.)", "tipo": "Maestra"}
         """
         response = model.generate_content([*real_parts, prompt])
         return response.text
@@ -116,7 +142,7 @@ tab1, tab2, tab3 = st.tabs(["📄 AUDITORÍA DE INFORMES (P1)", "🛡️ APUESTA
 # --- TAB 1: AUDITORÍA DE CADA PDF (PROMPT 1) ---
 with tab1:
     st.subheader("Fase 1: Control de Calidad de Simulaciones")
-    st.info("Sube cada informe PDF generado individualmente para medir la precisión de la simulación inicial.")
+    st.info("Sube cada informe PDF (Prompt 1) para comparar la Fase 2 (Goles, Corners, Tarjetas, Tiros, Penales) contra la realidad.")
     
     col_a, col_b = st.columns(2)
     with col_a:
@@ -126,7 +152,7 @@ with tab1:
     
     if st.button("▶ ANALIZAR INFORME INDIVIDUAL"):
         if pdf_ind and img_ind:
-            with st.status("Auditoría de Informe...") as status:
+            with st.status("Auditando Simulación Fase 2...") as status:
                 res = auditar_informe_individual(pdf_ind, img_ind)
                 json_match = re.search(r'\{.*\}', res, re.DOTALL)
                 if json_match:
