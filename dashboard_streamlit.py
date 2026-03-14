@@ -12,7 +12,7 @@ import time
 # CONFIGURACIÓN DE PÁGINA
 # =====================================================================
 st.set_page_config(
-    page_title="Quant/Sharp Auditor Pro v5.7",
+    page_title="Quant/Sharp Auditor Pro v5.8",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -97,10 +97,21 @@ def auditar_lote_informes(lista_pdfs, lista_imagenes):
         
         archivos_ia = []
         for pdf in lista_pdfs:
-            # Convertir a base64 no es necesario con el método de bytes directo
-            archivos_ia.append({"inlineData": {"mimeType": "application/pdf", "data": pdf.getvalue()}})
+            # Corregido a snake_case para la librería de Python
+            archivos_ia.append({
+                "inline_data": {
+                    "mime_type": "application/pdf",
+                    "data": pdf.getvalue()
+                }
+            })
         for img in lista_imagenes:
-            archivos_ia.append({"inlineData": {"mimeType": "image/png", "data": img.getvalue()}})
+            # Corregido a snake_case para la librería de Python
+            archivos_ia.append({
+                "inline_data": {
+                    "mime_type": "image/png",
+                    "data": img.getvalue()
+                }
+            })
 
         prompt = """
         [ROL] Auditor Jefe de Datos Deportivos.
@@ -130,8 +141,8 @@ def auditar_lote_informes(lista_pdfs, lista_imagenes):
           }
         ]
         """
-        # Payload estructurado según los requisitos del entorno
-        response = model.generate_content([{"text": prompt}] + archivos_ia)
+        # Enviamos el prompt como primer elemento de la lista de contenidos
+        response = model.generate_content([prompt] + archivos_ia)
         return response.text
     except Exception as e:
         return f"Error: {str(e)}"
@@ -140,7 +151,13 @@ def auditar_apuesta_maestra(texto_master, img_real_master):
     """Auditoría Crítica de la Selección Final (Prompt 2 - FRANCO-TIRADOR)"""
     try:
         model = genai.GenerativeModel(MODEL_NAME)
-        img_part = {"inlineData": {"mimeType": "image/png", "data": img_real_master.getvalue()}}
+        # Corregido a snake_case para la librería de Python
+        img_part = {
+            "inline_data": {
+                "mime_type": "image/png",
+                "data": img_real_master.getvalue()
+            }
+        }
 
         prompt = f"""
         [ROL] Auditor Jefe de Riesgos (FRANCO-TIRADOR v5.0).
@@ -152,7 +169,7 @@ def auditar_apuesta_maestra(texto_master, img_real_master):
         
         {{"partido": "text", "pronostico": "Mercado elegido", "marcador_final": "text", "goles_totales": int, "corners": int, "tarjetas": int, "posesion": "text", "estado": "🟢 o 🔴", "sim_goles": "N/A", "sim_corners": "N/A", "exactitud_sim": "100% o 0%", "analisis_tecnico": "Cruce final", "tipo": "Maestra"}}
         """
-        response = model.generate_content([{"text": prompt}, img_part])
+        response = model.generate_content([prompt, img_part])
         return response.text
     except Exception as e:
         return f"Error: {str(e)}"
@@ -161,7 +178,7 @@ def auditar_apuesta_maestra(texto_master, img_real_master):
 # INTERFAZ DE USUARIO
 # =====================================================================
 st.title("🎯 Quant/Sharp Auditor Pro")
-st.markdown("Protocolo de Seguridad v5.7 - Sistema Robusto de Auditoría")
+st.markdown("Protocolo de Seguridad v5.8 - Sistema Robusto de Auditoría")
 
 tab1, tab2, tab3 = st.tabs(["📄 AUDITORÍA POR LOTES (P1)", "🛡️ APUESTA MAESTRA (P2)", "📊 PANEL DE CONTROL"])
 
@@ -191,7 +208,6 @@ with tab1:
                 if json_str:
                     try:
                         resultados_lista = json.loads(json_str)
-                        # Si es un solo objeto lo ponemos en lista
                         if isinstance(resultados_lista, dict):
                             resultados_lista = [resultados_lista]
                             
@@ -291,4 +307,4 @@ with tab3:
     except Exception as e:
         st.error(f"Error de base de datos: {e}")
 
-st.sidebar.caption("Quant/Sharp v5.7 | Franco-Tirador Workflow")
+st.sidebar.caption("Quant/Sharp v5.8 | Franco-Tirador Workflow")
