@@ -12,7 +12,7 @@ import time
 # CONFIGURACIÓN DE PÁGINA
 # =====================================================================
 st.set_page_config(
-    page_title="Quant/Sharp Auditor Pro v5.8",
+    page_title="Quant/Sharp Auditor Pro v5.9",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -67,8 +67,8 @@ SUPABASE_URL = "https://tnxhmhoczcbfmhieaxgt.supabase.co"
 SUPABASE_KEY = "sb_publishable_4SX3y_184dNOObMxbRTIYA_3qSbfYUt"
 GEMINI_API_KEY = "AIzaSyDkjIDZOMeISbINKYV6qprTFuW_GWpCvqU"
 
-# Usar el modelo compatible con el entorno de preview
-MODEL_NAME = "gemini-2.5-flash-preview-09-2025"
+# MODELO CORREGIDO PARA PRODUCCIÓN (STREAMLIT CLOUD)
+MODEL_NAME = "gemini-1.5-flash"
 
 genai.configure(api_key=GEMINI_API_KEY)
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -78,7 +78,6 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # =====================================================================
 def extract_json(text):
     """Extrae bloques JSON de una respuesta de texto, incluso si tiene markdown"""
-    # Intentar encontrar una lista [ ... ] o un objeto { ... }
     list_match = re.search(r'\[\s*\{.*\}\s*\]', text, re.DOTALL)
     if list_match:
         return list_match.group()
@@ -95,54 +94,53 @@ def auditar_lote_informes(lista_pdfs, lista_imagenes):
     try:
         model = genai.GenerativeModel(MODEL_NAME)
         
-        archivos_ia = []
+        # Construimos la lista de partes para el mensaje
+        partes_contenido = [
+            """
+            [ROL] Auditor Jefe de Datos Deportivos.
+            [TAREA]
+            1. EMPAREJAMIENTO: Identifica qué imagen corresponde a qué PDF basándote estrictamente en los nombres de los equipos.
+            2. AUDITORÍA: Compara la Fase 2 (Simulación) del PDF contra los resultados reales de la imagen.
+            3. MÉTRICAS: Extrae Goles, Corners, Tarjetas, Posesión, Tiros al arco y Penales.
+            
+            [REGLA DE ORO] RESPONDE EXCLUSIVAMENTE CON UNA LISTA JSON. NO AGREGUES TEXTO ANTES NI DESPUÉS.
+            
+            Formato de la lista:
+            [
+              {
+                "partido": "Nombre exacto",
+                "pronostico": "Resumen recomendaciones",
+                "marcador_final": "Resultado real",
+                "goles_totales": int,
+                "corners": int,
+                "tarjetas": int,
+                "posesion": "XX%",
+                "estado": "🟢 (Acierto) o 🔴 (Fallo)",
+                "sim_goles": "Rango proyectado",
+                "sim_corners": "Rango proyectado",
+                "exactitud_sim": "XX%",
+                "analisis_tecnico": "Tabla comparativa Markdown",
+                "tipo": "Individual"
+              }
+            ]
+            """
+        ]
+
+        # Añadimos los PDFs
         for pdf in lista_pdfs:
-            # Corregido a snake_case para la librería de Python
-            archivos_ia.append({
-                "inline_data": {
-                    "mime_type": "application/pdf",
-                    "data": pdf.getvalue()
-                }
+            partes_contenido.append({
+                "mime_type": "application/pdf",
+                "data": pdf.getvalue()
             })
+            
+        # Añadimos las Imágenes
         for img in lista_imagenes:
-            # Corregido a snake_case para la librería de Python
-            archivos_ia.append({
-                "inline_data": {
-                    "mime_type": "image/png",
-                    "data": img.getvalue()
-                }
+            partes_contenido.append({
+                "mime_type": "image/png",
+                "data": img.getvalue()
             })
 
-        prompt = """
-        [ROL] Auditor Jefe de Datos Deportivos.
-        [TAREA]
-        1. EMPAREJAMIENTO: Identifica qué imagen corresponde a qué PDF basándote estrictamente en los nombres de los equipos.
-        2. AUDITORÍA: Compara la Fase 2 (Simulación) del PDF contra los resultados reales de la imagen.
-        3. MÉTRICAS: Extrae Goles, Corners, Tarjetas, Posesión, Tiros al arco y Penales.
-        
-        [REGLA DE ORO] RESPONDE EXCLUSIVAMENTE CON UNA LISTA JSON. NO AGREGUES TEXTO ANTES NI DESPUÉS.
-        
-        Formato de la lista:
-        [
-          {
-            "partido": "Nombre exacto",
-            "pronostico": "Resumen recomendaciones",
-            "marcador_final": "Resultado real",
-            "goles_totales": int,
-            "corners": int,
-            "tarjetas": int,
-            "posesion": "XX%",
-            "estado": "🟢 (Acierto) o 🔴 (Fallo)",
-            "sim_goles": "Rango proyectado",
-            "sim_corners": "Rango proyectado",
-            "exactitud_sim": "XX%",
-            "analisis_tecnico": "Tabla comparativa Markdown",
-            "tipo": "Individual"
-          }
-        ]
-        """
-        # Enviamos el prompt como primer elemento de la lista de contenidos
-        response = model.generate_content([prompt] + archivos_ia)
+        response = model.generate_content(partes_contenido)
         return response.text
     except Exception as e:
         return f"Error: {str(e)}"
@@ -151,25 +149,27 @@ def auditar_apuesta_maestra(texto_master, img_real_master):
     """Auditoría Crítica de la Selección Final (Prompt 2 - FRANCO-TIRADOR)"""
     try:
         model = genai.GenerativeModel(MODEL_NAME)
-        # Corregido a snake_case para la librería de Python
-        img_part = {
-            "inline_data": {
-                "mime_type": "image/png",
-                "data": img_real_master.getvalue()
-            }
-        }
-
+        
         prompt = f"""
         [ROL] Auditor Jefe de Riesgos (FRANCO-TIRADOR v5.0).
         [TEXTO DEL PRONÓSTICO]: {texto_master}
         
-        [TAREA] Verifica la 'APUESTA MAESTRA' y la 'RECOMENDACIÓN SECUNDARIA' contra la imagen real.
+        [TAREA] Verifica la 'APUESTA MAESTRA' y la 'RECOMENDACIÓN SECUNDARIA' contra la imagen real proporcionada.
         
         [REGLA] RESPONDE EXCLUSIVAMENTE CON UN OBJETO JSON.
         
         {{"partido": "text", "pronostico": "Mercado elegido", "marcador_final": "text", "goles_totales": int, "corners": int, "tarjetas": int, "posesion": "text", "estado": "🟢 o 🔴", "sim_goles": "N/A", "sim_corners": "N/A", "exactitud_sim": "100% o 0%", "analisis_tecnico": "Cruce final", "tipo": "Maestra"}}
         """
-        response = model.generate_content([prompt, img_part])
+        
+        partes = [
+            prompt,
+            {
+                "mime_type": "image/png",
+                "data": img_real_master.getvalue()
+            }
+        ]
+        
+        response = model.generate_content(partes)
         return response.text
     except Exception as e:
         return f"Error: {str(e)}"
@@ -178,7 +178,7 @@ def auditar_apuesta_maestra(texto_master, img_real_master):
 # INTERFAZ DE USUARIO
 # =====================================================================
 st.title("🎯 Quant/Sharp Auditor Pro")
-st.markdown("Protocolo de Seguridad v5.8 - Sistema Robusto de Auditoría")
+st.markdown("Protocolo de Seguridad v5.9 - Sistema Robusto de Auditoría")
 
 tab1, tab2, tab3 = st.tabs(["📄 AUDITORÍA POR LOTES (P1)", "🛡️ APUESTA MAESTRA (P2)", "📊 PANEL DE CONTROL"])
 
@@ -229,7 +229,7 @@ with tab1:
                             st.code(res_text)
                 else:
                     status.update(label="❌ Fallo en la extracción", state="error")
-                    st.error("No se pudo extraer información válida. La IA no generó el formato esperado.")
+                    st.error("No se pudo extraer información válida. Revisa la calidad de los archivos.")
                     with st.expander("Ver respuesta de la IA"):
                         st.write(res_text if res_text else "Sin respuesta del servidor.")
         else:
@@ -307,4 +307,4 @@ with tab3:
     except Exception as e:
         st.error(f"Error de base de datos: {e}")
 
-st.sidebar.caption("Quant/Sharp v5.8 | Franco-Tirador Workflow")
+st.sidebar.caption("Quant/Sharp v5.9 | Franco-Tirador Workflow")
