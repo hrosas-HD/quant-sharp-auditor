@@ -65,9 +65,14 @@ st.markdown("""
 # --- CONEXIÓN A APIS ---
 SUPABASE_URL = "https://tnxhmhoczcbfmhieaxgt.supabase.co"
 SUPABASE_KEY = "sb_publishable_4SX3y_184dNOObMxbRTIYA_3qSbfYUt"
-GEMINI_API_KEY = "AIzaSyDkjIDZOMeISbINKYV6qprTFuW_GWpCvqU"
 
-# MODELO CORREGIDO PARA PRODUCCIÓN (STREAMLIT CLOUD)
+# Intento de leer la API Key desde secrets o usar la hardcoded
+if "GEMINI_API_KEY" in st.secrets:
+    GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+else:
+    GEMINI_API_KEY = "AIzaSyDkjIDZOMeISbINKYV6qprTFuW_GWpCvqU"
+
+# NOMBRE DEL MODELO ESTÁNDAR
 MODEL_NAME = "gemini-1.5-flash"
 
 genai.configure(api_key=GEMINI_API_KEY)
@@ -92,6 +97,7 @@ def extract_json(text):
 def auditar_lote_informes(lista_pdfs, lista_imagenes):
     """Procesa múltiples informes e imágenes, emparejándolos automáticamente"""
     try:
+        # Inicialización del modelo
         model = genai.GenerativeModel(MODEL_NAME)
         
         # Construimos la lista de partes para el mensaje
@@ -230,8 +236,15 @@ with tab1:
                 else:
                     status.update(label="❌ Fallo en la extracción", state="error")
                     st.error("No se pudo extraer información válida. Revisa la calidad de los archivos.")
-                    with st.expander("Ver respuesta de la IA"):
+                    with st.expander("Ver respuesta de la IA (Depuración)"):
                         st.write(res_text if res_text else "Sin respuesta del servidor.")
+                        if "404" in res_text:
+                            st.warning("⚠️ El modelo gemini-1.5-flash no fue encontrado. Intentando listar modelos disponibles...")
+                            try:
+                                available_models = [m.name for m in genai.list_models()]
+                                st.write("Modelos en tu cuenta:", available_models)
+                            except:
+                                st.error("No se pudieron listar los modelos. Verifica tu API Key.")
         else:
             st.warning("Debes cargar al menos un PDF y una Imagen.")
 
