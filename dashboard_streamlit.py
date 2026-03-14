@@ -12,13 +12,13 @@ import time
 # CONFIGURACIÓN DE PÁGINA
 # =====================================================================
 st.set_page_config(
-    page_title="Quant/Sharp Auditor Pro v5.0",
+    page_title="Quant/Sharp Auditor Pro v5.6",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# --- ESTILOS CSS PERSONALIZADOS (LOOK PREMIUM) ---
+# --- ESTILOS CSS PERSONALIZADOS (LOOK PREMIUM + ANIMACIÓN DE CARGA) ---
 st.markdown("""
     <style>
     .main { background-color: #0e1117; }
@@ -36,6 +36,20 @@ st.markdown("""
         color: white;
         font-weight: bold;
         border: none;
+    }
+    /* Animación de pulso para la carga */
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.5; }
+        100% { opacity: 1; }
+    }
+    .loading-text {
+        font-size: 1.2rem;
+        color: #58a6ff;
+        font-weight: bold;
+        animation: pulse 1.5s infinite;
+        text-align: center;
+        margin: 10px 0;
     }
     .stTabs [aria-selected="true"] {
         background-color: #1f6feb !important;
@@ -57,50 +71,46 @@ genai.configure(api_key=GEMINI_API_KEY)
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # =====================================================================
-# MOTOR DE IA - CRUCE DE DATOS MULTI-FUENTE
+# MOTOR DE IA - CRUCE DE DATOS Y EMPAREJAMIENTO INTELIGENTE
 # =====================================================================
-def auditar_informe_individual(pdf_sim, img_real):
-    """Compara un informe PDF individual (Prompt 1) con su resultado real"""
+def auditar_lote_informes(lista_pdfs, lista_imagenes):
+    """Procesa múltiples informes e imágenes, emparejándolos automáticamente"""
     try:
         model = genai.GenerativeModel("models/gemini-1.5-flash")
-        pdf_parts = [{"mime_type": "application/pdf", "data": pdf_sim.getvalue()}]
-        real_parts = [{"mime_type": "image/jpeg", "data": img_real.getvalue()}]
+        
+        archivos_ia = []
+        for pdf in lista_pdfs:
+            archivos_ia.append({"mime_type": "application/pdf", "data": pdf.getvalue()})
+        for img in lista_imagenes:
+            archivos_ia.append({"mime_type": "image/jpeg", "data": img.getvalue()})
 
         prompt = """
-        [ROL] Auditor de Simulación Pro (Fase 2 vs Realidad).
-        [TAREA] Analiza la FASE 2 del PDF (Simulación) y compárala con las estadísticas reales de la Imagen.
+        [ROL] Auditor Jefe de Datos Deportivos.
+        [TAREA]
+        1. EMPAREJAMIENTO: Lee el contenido de cada PDF y cada imagen. Identifica qué imagen corresponde a qué PDF.
+        2. AUDITORÍA INDIVIDUAL: Compara la Simulación (Fase 2) contra la Realidad.
+        3. MÉTRICAS: Extrae Goles, Corners, Tarjetas, Posesión, Tiros al arco y Penales.
         
-        [MÉTRICAS A EXTRAER Y COMPARAR]
-        Extrae obligatoriamente estos datos de AMBAS fuentes (si están disponibles):
-        1. Goles (Marcador).
-        2. Tiros de Esquina (Corners).
-        3. Tarjetas (Amarillas/Rojas).
-        4. Posesión de Balón (%).
-        5. Tiros al Arco (Shots on Target).
-        6. Penales (Concedidos/Anotados).
-        
-        [ANÁLISIS]
-        - Compara los rangos proyectados en la simulación contra el dato real exacto.
-        - Evalúa si el análisis del Prompt 1 fue acertado en su lectura de la dinámica del partido.
-        
-        Devuelve un JSON:
-        {
-          "partido": "Nombre de los equipos",
-          "pronostico": "Resumen de recomendaciones del informe PDF",
-          "marcador_final": "Resultado final",
-          "goles_totales": int,
-          "corners": int,
-          "tarjetas": int,
-          "posesion": "text %",
-          "estado": "🟢 (Simulación acertada) / 🔴 (Desviación crítica)",
-          "sim_goles": "Rango proyectado en Fase 2",
-          "sim_corners": "Rango proyectado en Fase 2",
-          "exactitud_sim": "Cálculo técnico de precisión %",
-          "analisis_tecnico": "Tabla comparativa Markdown detallada: Goles, Corners, Tarjetas, Posesión, Tiros al arco y Penales (Simulado vs Real)",
-          "tipo": "Individual"
-        }
+        Devuelve una LISTA JSON:
+        [
+          {
+            "partido": "Equipo A vs Equipo B",
+            "pronostico": "Recomendaciones del PDF",
+            "marcador_final": "Resultado",
+            "goles_totales": int,
+            "corners": int,
+            "tarjetas": int,
+            "posesion": "text %",
+            "estado": "🟢/🔴",
+            "sim_goles": "Rango Fase 2",
+            "sim_corners": "Rango Fase 2",
+            "exactitud_sim": "text %",
+            "analisis_tecnico": "Tabla comparativa de todas las métricas",
+            "tipo": "Individual"
+          }
+        ]
         """
-        response = model.generate_content([*pdf_parts, *real_parts, prompt])
+        response = model.generate_content([*archivos_ia, prompt])
         return response.text
     except Exception as e:
         return f"Error: {str(e)}"
@@ -114,17 +124,10 @@ def auditar_apuesta_maestra(texto_master, img_real_master):
         prompt = f"""
         [ROL] Auditor Jefe de Riesgos (FRANCO-TIRADOR v5.0).
         [CONTEXTO - RESULTADO PROMPT 2]: {texto_master}
-        
-        [TAREA] 
-        1. Identifica 'LA APUESTA MAESTRA' y su mercado.
-        2. Identifica la 'RECOMENDACIÓN SECUNDARIA (CÓRNERS)'.
-        3. Contrasta AMBAS selecciones con la Imagen Real (Goles, Corners, Tarjetas, Tiros al arco, Penales).
-        
-        [VERDICTO]
-        Determina si la Apuesta Maestra fue ganada. Menciona también si el mercado de corners se acertó y si la lectura de seguridad fue correcta frente a las estadísticas reales.
+        [TAREA] Verifica la 'APUESTA MAESTRA' y la 'RECOMENDACIÓN SECUNDARIA' contra la Imagen Real.
         
         Devuelve un JSON:
-        {"partido": "text", "pronostico": "Mercado Apuesta Maestra", "marcador_final": "text", "goles_totales": int, "corners": int, "tarjetas": int, "posesion": "text", "estado": "🟢 (Ganada) / 🔴 (Perdida)", "sim_goles": "N/A", "sim_corners": "N/A", "exactitud_sim": "100% o 0%", "analisis_tecnico": "Resumen de acierto de Maestra + Córners. Comparativa de estadísticas clave (Tiros, Penales, etc.)", "tipo": "Maestra"}
+        {"partido": "text", "pronostico": "Mercado Apuesta Maestra", "marcador_final": "text", "goles_totales": int, "corners": int, "tarjetas": int, "posesion": "text", "estado": "🟢 (Ganada) / 🔴 (Perdida)", "sim_goles": "N/A", "sim_corners": "N/A", "exactitud_sim": "100% o 0%", "analisis_tecnico": "Cruce técnico final", "tipo": "Maestra"}
         """
         response = model.generate_content([*real_parts, prompt])
         return response.text
@@ -135,64 +138,83 @@ def auditar_apuesta_maestra(texto_master, img_real_master):
 # INTERFAZ DE USUARIO
 # =====================================================================
 st.title("🎯 Quant/Sharp Auditor Pro")
-st.markdown("Protocolo de Seguridad v5.0 - Auditoría de Selección Única")
+st.markdown("Protocolo de Seguridad v5.6 - Centro de Auditoría Inteligente")
 
-tab1, tab2, tab3 = st.tabs(["📄 AUDITORÍA DE INFORMES (P1)", "🛡️ APUESTA MAESTRA (P2)", "📊 PANEL DE CONTROL"])
+tab1, tab2, tab3 = st.tabs(["📄 AUDITORÍA POR LOTES (P1)", "🛡️ APUESTA MAESTRA (P2)", "📊 PANEL DE CONTROL"])
 
-# --- TAB 1: AUDITORÍA DE CADA PDF (PROMPT 1) ---
+# --- TAB 1: AUDITORÍA POR LOTES ---
 with tab1:
-    st.subheader("Fase 1: Control de Calidad de Simulaciones")
-    st.info("Sube cada informe PDF (Prompt 1) para comparar la Fase 2 (Goles, Corners, Tarjetas, Tiros, Penales) contra la realidad.")
+    st.subheader("Fase 1: Control de Calidad de Simulaciones (Múltiple)")
+    st.info("Sube todos tus informes PDF y las imágenes de resultados para el emparejamiento automático.")
     
     col_a, col_b = st.columns(2)
     with col_a:
-        pdf_ind = st.file_uploader("Subir Informe PDF del Partido", type="pdf", key="up_pdf")
+        pdfs_batch = st.file_uploader("Subir Informes PDF", type="pdf", accept_multiple_files=True, key="up_pdfs")
     with col_b:
-        img_ind = st.file_uploader("Subir Resultado Real", type=["jpg", "png", "jpeg"], key="up_img_ind")
+        imgs_batch = st.file_uploader("Subir Imágenes de Resultados", type=["jpg", "png", "jpeg"], accept_multiple_files=True, key="up_imgs")
     
-    if st.button("▶ ANALIZAR INFORME INDIVIDUAL"):
-        if pdf_ind and img_ind:
-            with st.status("Auditando Simulación Fase 2...") as status:
-                res = auditar_informe_individual(pdf_ind, img_ind)
-                json_match = re.search(r'\{.*\}', res, re.DOTALL)
+    if st.button("▶ INICIAR AUDITORÍA POR LOTE"):
+        if pdfs_batch and imgs_batch:
+            # Iniciamos el contenedor de estado con visualización de carga
+            with st.status("🚀 Iniciando proceso de auditoría...", expanded=True) as status:
+                st.markdown('<p class="loading-text">🧠 La IA está leyendo y emparejando archivos...</p>', unsafe_allow_html=True)
+                
+                start_time = time.time()
+                res_text = auditar_lote_informes(pdfs_batch, imgs_batch)
+                
+                st.markdown('<p class="loading-text">📊 Comparando métricas (Goles, Corners, Tiros)...</p>', unsafe_allow_html=True)
+                
+                json_match = re.search(r'\[\s*\{.*\}\s*\]', res_text, re.DOTALL)
                 if json_match:
-                    data = json.loads(json_match.group())
-                    supabase.table("auditoria_apuestas").insert(data).execute()
-                    status.update(label="✅ Informe Individual Auditado", state="complete")
-                    st.markdown(re.sub(r'```json.*?```', '', res, flags=re.DOTALL))
+                    try:
+                        resultados_lista = json.loads(json_match.group())
+                        st.markdown(f'<p class="loading-text">💾 Guardando {len(resultados_lista)} resultados en la nube...</p>', unsafe_allow_html=True)
+                        
+                        for item in resultados_lista:
+                            supabase.table("auditoria_apuestas").insert(item).execute()
+                        
+                        duration = round(time.time() - start_time, 2)
+                        status.update(label=f"✅ {len(resultados_lista)} partidos auditados en {duration}s", state="complete", expanded=False)
+                        st.success(f"¡Procesamiento completo! Se han sincronizado {len(resultados_lista)} registros.")
+                        
+                        for r in resultados_lista:
+                            with st.expander(f"Auditoría: {r['partido']} - {r['estado']}"):
+                                st.markdown(r['analisis_tecnico'])
+                    except Exception as e:
+                        st.error(f"Error al procesar: {e}")
+                else:
+                    status.update(label="❌ Error en el emparejamiento", state="error")
+                    st.error("No se pudo extraer información válida. Revisa la calidad de los archivos.")
         else:
-            st.warning("Se requiere PDF y captura de resultados.")
+            st.warning("Carga los archivos antes de ejecutar.")
 
-# --- TAB 2: APUESTA MAESTRA (PROMPT 2) ---
+# --- TAB 2: APUESTA MAESTRA ---
 with tab2:
     st.subheader("Fase 2: Validación del Veredicto Final")
-    st.markdown("#### *'Proteger el capital es la única prioridad.'*")
     
     col_master1, col_master2 = st.columns([1, 1])
     with col_master1:
-        st.markdown("**Resultado del Prompt 2 (Texto)**")
-        master_text = st.text_area("Pega aquí el reporte del Franco-Tirador...", height=300, placeholder="🛡️ LA APUESTA MAESTRA...")
-    
+        master_text = st.text_area("Texto del Franco-Tirador (P2)", height=250, placeholder="🛡️ LA APUESTA MAESTRA...")
     with col_master2:
-        st.markdown("**Resultado Real del Partido Elegido**")
-        master_img = st.file_uploader("Subir Estadísticas del Partido Maestro", type=["jpg", "png", "jpeg"], key="up_master")
+        master_img = st.file_uploader("Estadísticas del Partido Maestro", type=["jpg", "png", "jpeg"], key="up_master")
     
-    if st.button("▶ VALIDAR APUESTA MAESTRA v5.0"):
+    if st.button("▶ VALIDAR APUESTA MAESTRA"):
         if master_text and master_img:
-            with st.status("Ejecutando Guillotina de Verificación...") as status:
+            with st.status("🔍 Verificando apuesta maestra...", expanded=True) as status:
+                st.markdown('<p class="loading-text">🎯 Cruzando selección con estadísticas finales...</p>', unsafe_allow_html=True)
                 res = auditar_apuesta_maestra(master_text, master_img)
+                
                 json_match = re.search(r'\{.*\}', res, re.DOTALL)
                 if json_match:
                     data = json.loads(json_match.group())
                     supabase.table("auditoria_apuestas").insert(data).execute()
-                    status.update(label="✅ Apuesta Maestra Registrada", state="complete")
+                    status.update(label="✅ Apuesta Maestra Validada", state="complete", expanded=False)
                     st.balloons()
-                    st.markdown("### 🏆 Veredicto de la IA sobre tu Apuesta Maestra")
                     st.markdown(re.sub(r'```json.*?```', '', res, flags=re.DOTALL))
         else:
-            st.warning("Pega el texto de la selección maestra y sube la imagen del resultado.")
+            st.warning("Completa los campos para validar.")
 
-# --- TAB 3: DASHBOARD DE RENDIMIENTO ---
+# --- TAB 3: DASHBOARD ---
 with tab3:
     try:
         response = supabase.table("auditoria_apuestas").select("*").order("fecha", desc=True).execute()
@@ -200,54 +222,34 @@ with tab3:
 
         if not df.empty:
             df['fecha'] = pd.to_datetime(df['fecha'])
+            op_tipo = st.pills("Ver datos de:", ["Todos", "Individuales", "Apuestas Maestras"], default="Todos")
             
-            # Filtro por Tipo de Operación
-            st.markdown("### Rendimiento por Segmento")
-            op_tipo = st.pills("Filtrar Auditorías:", ["Todos", "Individuales", "Apuestas Maestras"], default="Todos")
-            
-            if op_tipo == "Individuales":
-                df_view = df[df['tipo'] == 'Individual']
-            elif op_tipo == "Apuestas Maestras":
-                df_view = df[df['tipo'] == 'Maestra']
-            else:
-                df_view = df
+            df_view = df if op_tipo == "Todos" else df[df['tipo'] == ('Individual' if op_tipo == "Individuales" else 'Maestra')]
 
-            # KPIs de Backtesting
             k1, k2, k3, k4 = st.columns(4)
             total = len(df_view)
             hits = len(df_view[df_view['estado'].str.contains('🟢')])
             win_rate = (hits/total*100) if total > 0 else 0
             
-            k1.metric("Auditorías", total)
-            k2.metric("Tasa de Acierto", f"{win_rate:.1f}%")
-            k3.metric("Segmento", op_tipo)
-            k4.metric("Status", "🛡️ Protegido" if win_rate > 60 else "⚠️ Revisar Filtros")
+            k1.metric("Partidos", total)
+            k2.metric("Acierto %", f"{win_rate:.1f}%")
+            k3.metric("Filtro", op_tipo)
+            k4.metric("Status", "🛡️ Seguro" if win_rate > 65 else "⚖️ Estable")
 
             st.markdown("---")
-            
-            # Gráficas
             g1, g2 = st.columns(2)
             with g1:
-                st.plotly_chart(px.pie(df_view, names='estado', hole=0.5, title="Distribución de Resultados",
+                st.plotly_chart(px.pie(df_view, names='estado', hole=0.5, title="Balance Global",
                                      color='estado', color_discrete_map={'🟢':'#2ea043','🔴':'#da3633'}), use_container_width=True)
             with g2:
-                # Evolución de acierto
-                df_view['hit_val'] = df_view['estado'].apply(lambda x: 1 if '🟢' in x else 0)
-                fig_evol = px.line(df_view.sort_values('fecha'), x='fecha', y='hit_val', markers=True, title="Histórico de Acierto (1=Win, 0=Loss)")
-                st.plotly_chart(fig_evol, use_container_width=True)
+                df_view['val'] = df_view['estado'].apply(lambda x: 1 if '🟢' in x else 0)
+                st.plotly_chart(px.line(df_view.sort_values('fecha'), x='fecha', y='val', markers=True, title="Evolución de Acierto"), use_container_width=True)
 
-            st.subheader("Detalle del Backtesting")
-            st.dataframe(
-                df_view[['fecha', 'partido', 'pronostico', 'estado', 'tipo', 'analisis_tecnico']],
-                column_config={
-                    "analisis_tecnico": st.column_config.TextColumn("Análisis de Coherencia", width="large")
-                },
-                use_container_width=True,
-                hide_index=True
-            )
+            st.subheader("Historial Completo")
+            st.dataframe(df_view[['fecha', 'partido', 'pronostico', 'estado', 'tipo', 'analisis_tecnico']], use_container_width=True, hide_index=True)
         else:
-            st.info("Inicia el flujo auditando tus primeros partidos.")
+            st.info("Aún no hay registros guardados.")
     except Exception as e:
         st.error(f"Error de base de datos: {e}")
 
-st.sidebar.caption("Quant/Sharp v5.0 | Workflow Franco-Tirador")
+st.sidebar.caption("Quant/Sharp v5.6 | Franco-Tirador Workflow")
