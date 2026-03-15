@@ -92,7 +92,7 @@ def call_gemini_with_retry(model_name, parts, max_retries=3):
                 err_str = str(e)
                 # Error de Cuota (Límite de peticiones)
                 if "429" in err_str:
-                    time.sleep((i + 1) * 5 + random.random())
+                    time.sleep((i + 1) * 5 + random.randint(0, 1000) / 1000)
                     continue
                 # Error de Modelo no encontrado
                 if "404" in err_str:
