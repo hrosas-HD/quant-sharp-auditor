@@ -13,7 +13,7 @@ import random
 # CONFIGURACIÓN DE PÁGINA
 # =====================================================================
 st.set_page_config(
-    page_title="Quant/Sharp Auditor Pro v7.3",
+    page_title="Quant/Sharp Auditor Pro v7.4",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -116,7 +116,7 @@ with st.sidebar:
         st.rerun()
 
     st.divider()
-    st.caption("v7.3 | Sistema Anti-Saturación 429")
+    st.caption("v7.4 | Solución Error 'list' object")
 
 # Inicialización de Supabase
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -145,15 +145,13 @@ def call_gemini_with_retry(model_name, parts, max_retries=5):
                 add_log(f"Error en intento {i+1}: {err_str}", "warning")
                 
                 if "429" in err_str:
-                    # Intentar extraer el tiempo de espera sugerido por la API
                     delay_match = re.search(r'retry_delay\s*{\s*seconds:\s*(\d+)', err_str)
                     if delay_match:
-                        wait = int(delay_match.group(1)) + 2 # Margen de seguridad
+                        wait = int(delay_match.group(1)) + 2
                     else:
-                        # Si no se encuentra, usar backoff agresivo (15s, 30s, 45s...)
                         wait = (i + 1) * 15 + random.random()
                     
-                    add_log(f"Cuota agotada. Pausa obligatoria de {wait:.2f}s...", "info")
+                    add_log(f"Cuota agotada. Pausa de {wait:.2f}s...", "info")
                     time.sleep(wait)
                     continue
                 
@@ -162,7 +160,7 @@ def call_gemini_with_retry(model_name, parts, max_retries=5):
                 
                 return None, err_str
                 
-        return None, "Error persistente tras 5 reintentos. La cuota está bloqueada temporalmente."
+        return None, "Error persistente tras reintentos."
     except Exception as e:
         add_log(f"Error crítico de motor: {str(e)}", "error")
         return None, f"Error de motor: {str(e)}"
@@ -171,7 +169,7 @@ def auditar_par_archivo(pdf, img, model_choice):
     prompt = """
     [ROL] Auditor Jefe de Datos Deportivos Pro.
     [TAREA] Compara la Fase 2 (Simulación) del PDF contra los resultados de la imagen real.
-    [REGLA] Devuelve un JSON con: partido, pronostico, marcador_final, goles_totales(int), corners(int), tarjetas(int), posesion, estado (🟢/🔴), sim_goles, sim_corners, exactitud_sim, analisis_tecnico, tipo: "Individual".
+    [REGLA] Devuelve un OBJETO JSON con: partido, pronostico, marcador_final, goles_totales(int), corners(int), tarjetas(int), posesion, estado (🟢/🔴), sim_goles, sim_corners, exactitud_sim, analisis_tecnico, tipo: "Individual".
     """
     partes = [
         prompt, 
@@ -215,12 +213,16 @@ with tab1:
                         continue
                     
                     try:
-                        data = json.loads(res_raw)
-                        supabase.table("auditoria_apuestas").insert(data).execute()
-                        st.success(f"✅ Guardado: {data.get('partido')}")
-                        add_log(f"Éxito en {data.get('partido')}. Guardado en DB.", "success")
+                        # PROCESAMIENTO ROBUSTO DE JSON (Maneja objeto o lista)
+                        datos_procesados = json.loads(res_raw)
+                        lista_datos = datos_procesados if isinstance(datos_procesados, list) else [datos_procesados]
                         
-                        # Pausa de seguridad aumentada para evitar ráfagas de tokens
+                        for item in lista_datos:
+                            supabase.table("auditoria_apuestas").insert(item).execute()
+                            nombre_partido = item.get('partido', 'Desconocido')
+                            st.success(f"✅ Guardado: {nombre_partido}")
+                            add_log(f"Éxito en {nombre_partido}. Guardado en DB.", "success")
+                        
                         time.sleep(5)
                     except Exception as e:
                         st.error(f"Error interpretando datos: {e}")
@@ -233,7 +235,6 @@ with tab1:
     st.divider()
     with st.expander("🛠️ Consola de Depuración Técnica", expanded=len(st.session_state.debug_logs) > 0):
         if st.session_state.debug_logs:
-            # Mostrar logs invertidos para ver lo último arriba
             log_content = "\n".join(st.session_state.debug_logs[::-1])
             st.text_area("Logs de sistema", value=log_content, height=300, disabled=True)
         else:
@@ -260,8 +261,13 @@ with tab2:
                 
                 if not err:
                     try:
-                        data = json.loads(res_raw)
-                        supabase.table("auditoria_apuestas").insert(data).execute()
+                        # PROCESAMIENTO ROBUSTO DE JSON (Maneja objeto o lista)
+                        datos_maestros = json.loads(res_raw)
+                        lista_m = datos_maestros if isinstance(datos_maestros, list) else [datos_maestros]
+                        
+                        for item in lista_m:
+                            supabase.table("auditoria_apuestas").insert(item).execute()
+                        
                         st.balloons()
                         st.success("✅ Apuesta Maestra auditada y guardada.")
                         add_log("Apuesta Maestra guardada con éxito.", "success")
@@ -296,4 +302,4 @@ with tab3:
         st.error(f"Error de base de datos.")
         add_log(f"Error DB: {str(e)}", "error")
 
-st.sidebar.caption("Quant/Sharp v7.3 | Anti-Quota Crash System")
+st.sidebar.caption("Quant/Sharp v7.4 | JSON Robustness Fix")
