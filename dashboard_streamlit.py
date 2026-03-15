@@ -48,15 +48,16 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- CONEXIÓN A APIS (SEGURA) ---
-# Requiere configurar st.secrets (ej: secrets.toml)
-SUPABASE_URL = st.secrets.get("SUPABASE_URL", "URL_POR_DEFECTO_SI_NO_EXISTE")
-SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "KEY_POR_DEFECTO_SI_NO_EXISTE")
+# --- CONEXIÓN A APIS ---
+# Plan A: Busca en st.secrets (Seguro). Plan B: Usa tus variables directamente (Para pruebas locales).
+SUPABASE_URL = st.secrets.get("SUPABASE_URL", "https://tnxhmhoczcbfmhieaxgt.supabase.co")
+SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "sb_publishable_4SX3y_184dNOObMxbRTIYA_3qSbfYUt")
 
+supabase = None
 try:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 except Exception as e:
-    st.error(f"Error inicializando Supabase: Verifica tus secrets. {e}")
+    st.error(f"Error inicializando Supabase: {e}")
 
 # =====================================================================
 # BARRA LATERAL (CENTRO DE COMANDO)
@@ -76,7 +77,7 @@ with st.sidebar:
         try:
             genai.configure(api_key=GEMINI_API_KEY)
             if st.button("🧪 Probar Conexión"):
-                genai.list_models() # Fuerza una llamada ligera a la API
+                genai.list_models()
                 st.success("Enlace Estable ✅")
                 add_log(f"Clave validada para {model_option}", "success")
         except Exception as e:
@@ -84,12 +85,16 @@ with st.sidebar:
 
     st.divider()
     if st.button("🔴 Borrado Maestro"):
-        try:
-            supabase.table("auditoria_apuestas").delete().neq("id", 0).execute()
-            st.success("Base limpia.")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Error al borrar DB: {e}")
+        if supabase:
+            try:
+                supabase.table("auditoria_apuestas").delete().neq("id", 0).execute()
+                st.success("Base limpia.")
+                time.sleep(1) # Pequeña pausa para que se vea el mensaje
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error al borrar DB: {e}")
+        else:
+            st.error("No hay conexión a la base de datos.")
 
     st.caption("Quant/Sharp v8.7 | JSON Recovery")
 
@@ -119,11 +124,10 @@ def auditar_partido(pdf, img, model_choice, status_placeholder):
         prompt = """
         Analiza PDF vs Imagen. Devuelve JSON estrictamente con esta estructura:
         { "partido": "string", "pronostico": "string", "marcador_final": "string", "estado": "🟢 o 🔴", "accuracy_score": int, 
-          "apuestas_detalle": [{"apuesta": "string", "hit": true/false}], 
-          "comparativa_simulacion": [{"metrica": "string", "informe": "string", "real": "string", "acerto": true/false}], "analisis_tecnico": "Markdown" }
+          "apuestas_detalle": [{"apuesta": "string", "hit": true}], 
+          "comparativa_simulacion": [{"metrica": "string", "informe": "string", "real": "string", "acerto": true}], "analisis_tecnico": "Markdown" }
         """
         
-        # FIX: Mime type dinámico según la imagen subida (PNG/JPEG)
         img_mime_type = img.type if img.type else "image/png"
         
         partes = [
@@ -182,8 +186,13 @@ with t1:
                             "tipo": "Individual",
                             "analisis_tecnico": json.dumps(data)
                         }
-                        supabase.table("auditoria_apuestas").insert(row).execute()
-                        st.success(f"Auditado con éxito: {row['partido']}")
+                        if supabase:
+                            supabase.table("auditoria_apuestas").insert(row).execute()
+                            st.success(f"Auditado y guardado con éxito: {row['partido']}")
+                        else:
+                            st.warning(f"Auditado, pero NO guardado (Sin DB): {row['partido']}")
+                            st.json(row) # Mostramos el resultado si no hay BD
+                            
                     except json.JSONDecodeError:
                         st.error(f"Fallo al interpretar el JSON de la IA. Respuesta cruda: {res_raw}")
                     except Exception as e:
@@ -198,56 +207,59 @@ with t1:
         logs = "\n".join(st.session_state.debug_logs[::-1])
         st.markdown(f'<div class="console-box">{logs if logs else "Sin registros."}</div>', unsafe_allow_html=True)
 
-# --- TAB 2: APUESTA MAESTRA (Añadido) ---
+# --- TAB 2: APUESTA MAESTRA ---
 with t2:
     st.subheader("🛡️ Gestión de Apuestas Maestras")
     st.info("Módulo en desarrollo. Aquí puedes agregar lógica para combinar métricas cruzadas.")
 
 # --- TAB 3: DASHBOARD ---
 with t3:
-    if st.button("🔄 Refrescar Datos"):
-        st.rerun()
+    col_ref, empty_col = st.columns([1, 4])
+    with col_ref:
+        if st.button("🔄 Refrescar Datos"):
+            st.rerun()
         
     try:
-        res = supabase.table("auditoria_apuestas").select("*").order("fecha", desc=True).execute()
-        if res.data:
-            df = pd.DataFrame(res.data)
-            df['fecha'] = pd.to_datetime(df['fecha'])
-            
-            m1, m2, m3 = st.columns(3)
-            # FIX: Convertimos a string por seguridad antes de hacer str.contains
-            hits = len(df[df['estado'].astype(str).str.contains('🟢', na=False)])
-            m1.metric("Informes Auditados", len(df))
-            m2.metric("Tasa de Acierto", f"{(hits/len(df)*100 if len(df)>0 else 0):.1f}%")
-            m3.metric("Riesgo", "🛡️ Activo")
-            
-            st.divider()
+        if supabase:
+            res = supabase.table("auditoria_apuestas").select("*").order("fecha", desc=True).execute()
+            if res.data:
+                df = pd.DataFrame(res.data)
+                df['fecha'] = pd.to_datetime(df['fecha'])
+                
+                m1, m2, m3 = st.columns(3)
+                hits = len(df[df['estado'].astype(str).str.contains('🟢', na=False)])
+                m1.metric("Informes Auditados", len(df))
+                m2.metric("Tasa de Acierto", f"{(hits/len(df)*100 if len(df)>0 else 0):.1f}%")
+                m3.metric("Riesgo", "🛡️ Activo")
+                
+                st.divider()
 
-            for _, row in df.iterrows():
-                try:
-                    if not row['analisis_tecnico']: continue
-                    full_json = json.loads(row['analisis_tecnico'])
-                    data = full_json[0] if isinstance(full_json, list) else full_json
-                    
-                    with st.expander(f"{row.get('estado', '⚪')} {row.get('partido', 'Unknown')} | {row['fecha'].strftime('%d/%m %H:%M')}"):
-                        ca, cb = st.columns([1, 2])
-                        with ca:
-                            st.write(f"**Confianza IA:** {data.get('accuracy_score', 0)}%")
-                            if st.button("🗑️ Borrar", key=f"del_{row['id']}"):
-                                supabase.table("auditoria_apuestas").delete().eq("id", row['id']).execute()
-                                st.rerun()
-                        with cb:
-                            for b in data.get('apuestas_detalle', []):
-                                # Usamos .get() para evitar KeyErrors si el JSON viene deformado
-                                is_hit = b.get("hit", False)
-                                txt_apuesta = b.get("apuesta", "Detalle desconocido")
-                                st.markdown(f'{"✅" if is_hit else "❌"} {txt_apuesta}')
-                except Exception as e:
-                    st.error(f"Fila ID {row.get('id')} corrupta.")
-                    if st.button(f"Limpiar Registro #{row.get('id')}", key=f"fix_{row.get('id')}"):
-                        supabase.table("auditoria_apuestas").delete().eq("id", row['id']).execute()
-                        st.rerun()
-        else: 
-            st.info("Base de datos vacía. Realiza tu primera auditoría.")
+                for _, row in df.iterrows():
+                    try:
+                        if not row['analisis_tecnico']: continue
+                        full_json = json.loads(row['analisis_tecnico'])
+                        data = full_json[0] if isinstance(full_json, list) else full_json
+                        
+                        with st.expander(f"{row.get('estado', '⚪')} {row.get('partido', 'Unknown')} | {row['fecha'].strftime('%d/%m %H:%M')}"):
+                            ca, cb = st.columns([1, 2])
+                            with ca:
+                                st.write(f"**Confianza IA:** {data.get('accuracy_score', 0)}%")
+                                if st.button("🗑️ Borrar", key=f"del_{row['id']}"):
+                                    supabase.table("auditoria_apuestas").delete().eq("id", row['id']).execute()
+                                    st.rerun()
+                            with cb:
+                                for b in data.get('apuestas_detalle', []):
+                                    is_hit = b.get("hit", False)
+                                    txt_apuesta = b.get("apuesta", "Detalle desconocido")
+                                    st.markdown(f'{"✅" if is_hit else "❌"} {txt_apuesta}')
+                    except Exception as e:
+                        st.error(f"Fila ID {row.get('id')} corrupta.")
+                        if st.button(f"Limpiar Registro #{row.get('id')}", key=f"fix_{row.get('id')}"):
+                            supabase.table("auditoria_apuestas").delete().eq("id", row['id']).execute()
+                            st.rerun()
+            else: 
+                st.info("Base de datos vacía. Realiza tu primera auditoría.")
+        else:
+            st.error("No se pudo conectar a Supabase. Revisa las credenciales.")
     except Exception as e: 
         st.error(f"Error de conexión con Supabase o procesando DB: {e}")
