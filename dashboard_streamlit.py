@@ -13,7 +13,7 @@ import random
 # CONFIGURACIÓN DE PÁGINA
 # =====================================================================
 st.set_page_config(
-    page_title="Quant/Sharp Auditor Pro v7.2",
+    page_title="Quant/Sharp Auditor Pro v7.3",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -116,7 +116,7 @@ with st.sidebar:
         st.rerun()
 
     st.divider()
-    st.caption("v7.2 | Sistema de Auditoría con Log")
+    st.caption("v7.3 | Sistema Anti-Saturación 429")
 
 # Inicialización de Supabase
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -124,7 +124,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # =====================================================================
 # LÓGICA DE IA CON CONTROL DE ROBUSTEZ
 # =====================================================================
-def call_gemini_with_retry(model_name, parts, max_retries=3):
+def call_gemini_with_retry(model_name, parts, max_retries=5):
     if not GEMINI_API_KEY:
         return None, "No hay API Key configurada."
         
@@ -143,15 +143,26 @@ def call_gemini_with_retry(model_name, parts, max_retries=3):
             except Exception as e:
                 err_str = str(e)
                 add_log(f"Error en intento {i+1}: {err_str}", "warning")
+                
                 if "429" in err_str:
-                    wait = (i + 1) * 5 + random.random()
-                    add_log(f"Esperando {wait:.2f}s por cuota...", "info")
+                    # Intentar extraer el tiempo de espera sugerido por la API
+                    delay_match = re.search(r'retry_delay\s*{\s*seconds:\s*(\d+)', err_str)
+                    if delay_match:
+                        wait = int(delay_match.group(1)) + 2 # Margen de seguridad
+                    else:
+                        # Si no se encuentra, usar backoff agresivo (15s, 30s, 45s...)
+                        wait = (i + 1) * 15 + random.random()
+                    
+                    add_log(f"Cuota agotada. Pausa obligatoria de {wait:.2f}s...", "info")
                     time.sleep(wait)
                     continue
+                
                 if "400" in err_str and "expired" in err_str.lower():
                     return None, "La clave de API ha expirado."
+                
                 return None, err_str
-        return None, "Error persistente tras reintentos."
+                
+        return None, "Error persistente tras 5 reintentos. La cuota está bloqueada temporalmente."
     except Exception as e:
         add_log(f"Error crítico de motor: {str(e)}", "error")
         return None, f"Error de motor: {str(e)}"
@@ -179,7 +190,7 @@ tab1, tab2, tab3 = st.tabs(["📄 AUDITORÍA INDIVIDUAL (P1)", "🛡️ APUESTA 
 # --- PESTAÑA 1: LOTES ---
 with tab1:
     st.subheader("Fase 1: Control de Calidad de Simulaciones")
-    st.info("Sube informes y capturas. Procesamiento secuencial para evitar errores de cuota.")
+    st.info("Sube informes y capturas. Procesamiento secuencial con gestión de cuota inteligente.")
     
     c1, c2 = st.columns(2)
     with c1:
@@ -208,7 +219,9 @@ with tab1:
                         supabase.table("auditoria_apuestas").insert(data).execute()
                         st.success(f"✅ Guardado: {data.get('partido')}")
                         add_log(f"Éxito en {data.get('partido')}. Guardado en DB.", "success")
-                        time.sleep(2)
+                        
+                        # Pausa de seguridad aumentada para evitar ráfagas de tokens
+                        time.sleep(5)
                     except Exception as e:
                         st.error(f"Error interpretando datos: {e}")
                         add_log(f"Error JSON en {pdfs[i].name}: {str(e)}", "error")
@@ -220,8 +233,9 @@ with tab1:
     st.divider()
     with st.expander("🛠️ Consola de Depuración Técnica", expanded=len(st.session_state.debug_logs) > 0):
         if st.session_state.debug_logs:
+            # Mostrar logs invertidos para ver lo último arriba
             log_content = "\n".join(st.session_state.debug_logs[::-1])
-            st.text_area("Logs de sistema", value=log_content, height=250, disabled=True)
+            st.text_area("Logs de sistema", value=log_content, height=300, disabled=True)
         else:
             st.write("No hay eventos registrados.")
 
@@ -282,4 +296,4 @@ with tab3:
         st.error(f"Error de base de datos.")
         add_log(f"Error DB: {str(e)}", "error")
 
-st.sidebar.caption("Quant/Sharp v7.2 | Consola Técnica Activa")
+st.sidebar.caption("Quant/Sharp v7.3 | Anti-Quota Crash System")
