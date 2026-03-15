@@ -121,11 +121,39 @@ def auditar_partido(pdf, img, model_choice, status_placeholder):
         time.sleep(0.5)
         update_status_ui(status_placeholder, 3, "Cruzando métricas...")
 
+        # PROMPT ESTANDARIZADO Y ROBUSTO
         prompt = """
-        Analiza PDF vs Imagen. Devuelve JSON estrictamente con esta estructura:
-        { "partido": "string", "pronostico": "string", "marcador_final": "string", "estado": "🟢 o 🔴", "accuracy_score": int, 
-          "apuestas_detalle": [{"apuesta": "string", "hit": true}], 
-          "comparativa_simulacion": [{"metrica": "string", "informe": "string", "real": "string", "acerto": true}], "analisis_tecnico": "Markdown" }
+        Eres un auditor estadístico experto de apuestas deportivas. Tu tarea es cruzar los pronósticos y simulaciones de un informe técnico (PDF) con la realidad de un partido (Imagen de Flashscore).
+
+        REGLAS MATEMÁTICAS DE CRUCE OBLIGATORIAS:
+        1. Lee la imagen con atención para extraer: Marcador final, Patadas de esquina (córners), Tarjetas amarillas, Posesión de balón y xG (Metas Esperadas).
+        2. Para evaluar apuestas en "apuestas_detalle", usa la lógica matemática, no intuición:
+           - Si la apuesta es "Doble Oportunidad 1X": hit=true SOLO SI el equipo local ganó o hubo empate.
+           - Si la apuesta es "Doble Oportunidad X2": hit=true SOLO SI el equipo visitante ganó o hubo empate.
+           - Si la apuesta es "Menos de 2.5 Goles": suma los goles de la imagen. hit=true SOLO SI es 0, 1 o 2.
+           - Si la apuesta es "Ambos Equipos Marcan - No": hit=true SOLO SI el marcador de la imagen tiene al menos un '0'.
+           - Si la apuesta es sobre Córners (ej. +8.5 córners): suma los córners de la imagen y evalúa.
+           - Si la apuesta es sobre Tarjetas: suma las tarjetas de la imagen y evalúa.
+        3. El campo "accuracy_score" (0-100) debe ser matemático: (Apuestas hit=true / Total de apuestas evaluadas) * 100.
+        4. En "comparativa_simulacion", cruza métricas de la 'Fase 2' del PDF frente a la imagen. Ejemplo:
+           - metrica: "Posesión de balón" | informe: "Kocaelispor monopolizará (aprox 60-70%)" | real: "Eyüpspor 68% - Kocaelispor 32%" | acerto: false.
+           - metrica: "Patadas de esquina" | informe: "9-11 totales" | real: "6 totales (3-3)" | acerto: false.
+
+        Devuelve JSON ESTRICTAMENTE con esta estructura (sin bloques markdown fuera del JSON):
+        {
+          "partido": "Nombre Equipo A vs Nombre Equipo B",
+          "pronostico": "Resumen general sugerido en el PDF",
+          "marcador_final": "Marcador extraído de la imagen (ej. 0-1)",
+          "estado": "🟢 (Si accuracy_score >= 50) o 🔴 (Si accuracy_score < 50)",
+          "accuracy_score": int,
+          "apuestas_detalle": [
+            {"apuesta": "Nombre de la apuesta exacta del PDF (ej. Menos de 2.5 Goles)", "hit": true o false}
+          ],
+          "comparativa_simulacion": [
+            {"metrica": "Ej. Córners, Posesión, Tarjetas", "informe": "Lo que predecía la fase 2 del PDF", "real": "El dato exacto extraído de la imagen", "acerto": true o false}
+          ],
+          "analisis_tecnico": "Breve explicación de por qué ganaron o perdieron las apuestas basado en los datos duros cruzados."
+        }
         """
         
         img_mime_type = img.type if img.type else "image/png"
@@ -175,7 +203,9 @@ with t1:
                 
                 if not err and res_raw:
                     try:
-                        raw_data = json.loads(res_raw)
+                        # Prevenir errores de bloque markdown ```json
+                        clean_json = res_raw.strip().strip('```json').strip('```')
+                        raw_data = json.loads(clean_json)
                         data = raw_data[0] if isinstance(raw_data, list) else raw_data
                         
                         row = {
@@ -229,7 +259,7 @@ with t3:
                 m1, m2, m3 = st.columns(3)
                 hits = len(df[df['estado'].astype(str).str.contains('🟢', na=False)])
                 m1.metric("Informes Auditados", len(df))
-                m2.metric("Tasa de Acierto", f"{(hits/len(df)*100 if len(df)>0 else 0):.1f}%")
+                m2.metric("Tasa de Acierto Global", f"{(hits/len(df)*100 if len(df)>0 else 0):.1f}%")
                 m3.metric("Riesgo", "🛡️ Activo")
                 
                 st.divider()
@@ -240,18 +270,29 @@ with t3:
                         full_json = json.loads(row['analisis_tecnico'])
                         data = full_json[0] if isinstance(full_json, list) else full_json
                         
-                        with st.expander(f"{row.get('estado', '⚪')} {row.get('partido', 'Unknown')} | {row['fecha'].strftime('%d/%m %H:%M')}"):
+                        with st.expander(f"{row.get('estado', '⚪')} {row.get('partido', 'Unknown')} | {row.get('marcador_final', '')} | {row['fecha'].strftime('%d/%m %H:%M')}"):
                             ca, cb = st.columns([1, 2])
                             with ca:
-                                st.write(f"**Confianza IA:** {data.get('accuracy_score', 0)}%")
+                                st.write(f"**Confianza Auditoría:** {data.get('accuracy_score', 0)}%")
+                                st.write("---")
                                 if st.button("🗑️ Borrar", key=f"del_{row['id']}"):
                                     supabase.table("auditoria_apuestas").delete().eq("id", row['id']).execute()
                                     st.rerun()
                             with cb:
+                                st.markdown("##### 🎯 Evaluación de Apuestas (Fase 3)")
                                 for b in data.get('apuestas_detalle', []):
                                     is_hit = b.get("hit", False)
                                     txt_apuesta = b.get("apuesta", "Detalle desconocido")
-                                    st.markdown(f'{"✅" if is_hit else "❌"} {txt_apuesta}')
+                                    st.markdown(f'{"✅" if is_hit else "❌"} **{txt_apuesta}**')
+                                
+                                st.markdown("---")
+                                st.markdown("##### 📊 Comparativa de Simulaciones (Fase 2)")
+                                for sim in data.get('comparativa_simulacion', []):
+                                    st.markdown(f"**{sim.get('metrica', 'Métrica')}**: Informe preveía _{sim.get('informe', 'N/A')}_ vs Realidad: **{sim.get('real', 'N/A')}** {'✅' if sim.get('acerto') else '❌'}")
+                                    
+                                if "analisis_tecnico" in data:
+                                    st.markdown("---")
+                                    st.markdown(f"**Resumen Técnico:** {data['analisis_tecnico']}")
                     except Exception as e:
                         st.error(f"Fila ID {row.get('id')} corrupta.")
                         if st.button(f"Limpiar Registro #{row.get('id')}", key=f"fix_{row.get('id')}"):
