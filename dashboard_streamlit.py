@@ -13,7 +13,7 @@ import random
 # CONFIGURACIÓN DE PÁGINA
 # =====================================================================
 st.set_page_config(
-    page_title="Quant/Sharp Auditor Pro v8.2",
+    page_title="Quant/Sharp Auditor Pro v8.3",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -26,69 +26,48 @@ if "debug_logs" not in st.session_state:
 def add_log(msg, type="info"):
     st.session_state.debug_logs.append(f"[{time.strftime('%H:%M:%S')}] [{type.upper()}] {msg}")
 
-# --- ESTILOS CSS PREMIUM (V8.2 - REFINADO) ---
+# --- ESTILOS CSS PREMIUM (V8.3 - FIX CARGA) ---
 st.markdown("""
     <style>
     .main { background-color: #0d1117; color: #c9d1d9; }
     
-    /* Animación de Carga Tecnológica */
+    /* Animación de Carga Mejorada */
     .scanning-wrapper {
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 40px;
-        background: rgba(22, 27, 34, 0.5);
-        border-radius: 20px;
-        border: 1px dashed #30363d;
+        padding: 30px;
+        background: rgba(22, 27, 34, 0.7);
+        border-radius: 15px;
+        border: 1px solid #30363d;
+        margin: 20px 0;
     }
     .scan-line {
         width: 100%;
-        height: 2px;
+        height: 3px;
         background: #58a6ff;
         box-shadow: 0 0 15px #58a6ff;
         position: relative;
-        animation: scan 2s linear infinite;
+        animation: scan 1.5s ease-in-out infinite;
     }
     @keyframes scan {
-        0% { top: 0; opacity: 0; }
-        50% { opacity: 1; }
-        100% { top: 100px; opacity: 0; }
+        0% { transform: translateY(0); opacity: 0.2; }
+        50% { transform: translateY(50px); opacity: 1; }
+        100% { transform: translateY(0); opacity: 0.2; }
     }
     
-    .loading-step {
-        font-family: 'Courier New', monospace;
-        color: #7ee787;
-        margin-top: 15px;
-        font-size: 0.9rem;
-    }
+    .loading-step { font-family: 'Courier New', monospace; color: #7ee787; margin-top: 20px; font-size: 1rem; }
+    .quota-wait { color: #f85149; font-weight: bold; animation: blink 1s infinite; }
+    @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
 
     /* Tarjetas de Apuestas */
-    .bet-card {
-        background: #161b22;
-        border-radius: 12px;
-        padding: 15px;
-        margin-bottom: 10px;
-        border: 1px solid #30363d;
-    }
-    .hit { border-left: 5px solid #238636; background: linear-gradient(90deg, rgba(35, 134, 54, 0.05) 0%, transparent 100%); }
-    .miss { border-left: 5px solid #da3633; background: linear-gradient(90deg, rgba(218, 54, 51, 0.05) 0%, transparent 100%); }
+    .bet-card { background: #161b22; border-radius: 10px; padding: 12px; margin-bottom: 10px; border: 1px solid #30363d; }
+    .hit { border-left: 5px solid #238636; }
+    .miss { border-left: 5px solid #da3633; }
     
-    /* Tabla de Simulación */
-    .modern-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    .modern-table th { color: #8b949e; text-align: left; padding: 10px; border-bottom: 1px solid #30363d; font-size: 0.8rem; }
-    .modern-table td { padding: 12px 10px; border-bottom: 1px solid #21262d; font-size: 0.9rem; }
-    
-    /* Consola */
     .console-box {
-        background: #010409;
-        color: #7ee787;
-        padding: 15px;
-        border-radius: 8px;
-        border: 1px solid #30363d;
-        font-family: 'Courier New', monospace;
-        height: 200px;
-        overflow-y: auto;
-        font-size: 0.85rem;
+        background: #010409; color: #7ee787; padding: 15px; border-radius: 8px; border: 1px solid #30363d;
+        font-family: 'Courier New', monospace; height: 180px; overflow-y: auto; font-size: 0.85rem;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -106,25 +85,24 @@ def render_accuracy_gauge(score, key_id):
     fig = go.Figure(go.Indicator(
         mode = "gauge+number",
         value = score,
-        title = {'text': "Confianza del Informe", 'font': {'size': 14, 'color': "#8b949e"}},
+        title = {'text': "Precisión de Simulación", 'font': {'size': 14, 'color': "#8b949e"}},
         number = {'suffix': "%", 'font': {'size': 35, 'color': "#ffffff"}},
         gauge = {
             'axis': {'range': [0, 100], 'tickcolor': "#30363d"},
             'bar': {'color': "#58a6ff"},
             'bgcolor': "rgba(0,0,0,0)",
             'steps': [
-                {'range': [0, 50], 'color': 'rgba(218, 54, 51, 0.15)'},
-                {'range': [50, 80], 'color': 'rgba(210, 153, 34, 0.15)'},
-                {'range': [80, 100], 'color': 'rgba(35, 134, 54, 0.15)'}
-            ],
-            'threshold': {'line': {'color': "#58a6ff", 'width': 2}, 'thickness': 0.75, 'value': score}
+                {'range': [0, 40], 'color': 'rgba(218, 54, 51, 0.2)'},
+                {'range': [40, 75], 'color': 'rgba(210, 153, 34, 0.2)'},
+                {'range': [75, 100], 'color': 'rgba(35, 134, 54, 0.2)'}
+            ]
         }
     ))
-    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=200, margin=dict(t=30, b=0, l=10, r=10))
+    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=180, margin=dict(t=30, b=0, l=10, r=10))
     return fig
 
 # =====================================================================
-# BARRA LATERAL (CENTRO DE COMANDO BLINDADO)
+# BARRA LATERAL (CENTRO DE COMANDO)
 # =====================================================================
 with st.sidebar:
     st.header("⚙️ Centro de Comando")
@@ -136,83 +114,73 @@ with st.sidebar:
     if GEMINI_API_KEY:
         try:
             genai.configure(api_key=GEMINI_API_KEY)
-            if st.button("🧪 Probar Conexión"):
+            if st.button("🧪 Probar Conexión API"):
                 genai.list_models()
                 st.success("Enlace Estable ✅")
-                add_log("Conexión con Gemini validada.", "success")
+                add_log("API Key validada.", "success")
         except Exception as e:
-            st.error(f"Error de enlace: {e}")
+            st.error(f"Error: {e}")
 
     st.divider()
     st.subheader("🧹 Mantenimiento")
     if st.button("🔴 Borrado Maestro (Base en Blanco)"):
         try:
-            # Borrado masivo directo
             supabase.table("auditoria_apuestas").delete().neq("id", 0).execute()
-            st.success("Base de datos reiniciada con éxito.")
-            add_log("Borrado maestro ejecutado.", "warning")
+            st.success("Base de datos reiniciada.")
+            add_log("Limpieza total realizada.", "warning")
             time.sleep(1)
             st.rerun()
         except Exception as e:
             st.error(f"Error al limpiar: {e}")
 
     st.divider()
-    st.caption("Quant/Sharp v8.2 | Deep Space System")
+    st.caption("Quant/Sharp v8.3 | Reliability & Maintenance")
 
 # =====================================================================
-# MOTOR DE IA CON MANEJO DE CUOTAS Y PASOS
+# MOTOR DE IA CON FEEDBACK DE ESPERA REAL
 # =====================================================================
+
+def update_status_ui(placeholder, step_num, text, is_waiting=False):
+    wait_html = '<div class="quota-wait"><br>⏳ LÍMITE DE CUOTA: Esperando reinicio (60s)...</div>' if is_waiting else ""
+    placeholder.markdown(f"""
+        <div class="scanning-wrapper">
+            <div class="scan-line"></div>
+            <div class="loading-step">[{step_num}/4] {text}</div>
+            {wait_html}
+        </div>
+    """, unsafe_allow_html=True)
 
 def auditar_partido(pdf, img, model_choice, status_placeholder):
     try:
         model = genai.GenerativeModel(model_name=model_choice, generation_config={"response_mime_type": "application/json"})
         
-        steps = [
-            "Escaneando PDF (Extrayendo Fase 2)...",
-            "Procesando Imagen (Visión Computacional)...",
-            "Cruzando Predicción vs Realidad...",
-            "Calculando Índice de Precisión..."
-        ]
-        
-        for i, step in enumerate(steps):
-            status_placeholder.markdown(f"""
-                <div class="scanning-wrapper">
-                    <div class="scan-line"></div>
-                    <div class="loading-step">[{i+1}/4] {step}</div>
-                </div>
-            """, unsafe_allow_html=True)
-            time.sleep(2)
-            add_log(step, "info")
+        # Fases visuales iniciales
+        update_status_ui(status_placeholder, 1, "Analizando estructura del PDF...")
+        time.sleep(1.5)
+        update_status_ui(status_placeholder, 2, "Procesando visión de imagen...")
+        time.sleep(1.5)
+        update_status_ui(status_placeholder, 3, "Iniciando motor de comparación...")
 
         prompt = """
-        [ROL] Auditor de Modelos Predictivos. 
-        [TAREA] Cruza el PDF (Simulación Fase 2) con la Realidad (Imagen).
-        Calcula accuracy_score (0-100) basado en el éxito de las apuestas y la cercanía de las métricas (Goles, Corners, Tarjetas, Posesión).
-        [JSON] { 
-            "partido": "Local vs Visitante", 
-            "pronostico": "string", 
-            "marcador_final": "X-X", 
-            "estado": "🟢/🔴", 
-            "accuracy_score": int, 
-            "apuestas_detalle": [{"apuesta": "string", "hit": bool}], 
-            "comparativa_simulacion": [{"metrica": "string", "informe": "string", "real": "string", "acerto": bool}],
-            "analisis_tecnico": "Markdown" 
-        }
+        [ROLE] Auditor Deportivo IA. 
+        [TASK] Cruza el PDF con la Imagen. Calcula accuracy_score (0-100).
+        [JSON] { "partido": "string", "pronostico": "string", "marcador_final": "string", "estado": "🟢/🔴", "accuracy_score": int, "apuestas_detalle": [{"apuesta": "string", "hit": bool}], "comparativa_simulacion": [{"metrica": "string", "informe": "string", "real": "string", "acerto": bool}], "analisis_tecnico": "Markdown" }
         """
         partes = [prompt, {"mime_type": "application/pdf", "data": pdf.getvalue()}, {"mime_type": "image/png", "data": img.getvalue()}]
         
-        # Manejo de reintento para error 429
+        # Manejo de reintentos con feedback visual
         max_retries = 3
         for retry in range(max_retries):
             try:
+                update_status_ui(status_placeholder, 4, "Generando reporte final...")
                 response = model.generate_content(partes)
-                add_log("Respuesta recibida satisfactoriamente.", "success")
+                add_log("Respuesta de IA recibida.", "success")
                 return response.text, None
             except Exception as e:
                 if "429" in str(e) and retry < max_retries - 1:
-                    wait = 60 # Tiempo sugerido por la API
-                    add_log(f"Cuota agotada. Esperando {wait}s...", "warning")
-                    time.sleep(wait)
+                    update_status_ui(status_placeholder, 4, "Esperando por saturación de API...", is_waiting=True)
+                    add_log("Cuota agotada. Pausa de 60s.", "warning")
+                    time.sleep(60)
                     continue
                 return None, str(e)
                 
@@ -227,14 +195,14 @@ st.title("🎯 Quant/Sharp Auditor Pro")
 t1, t2, t3 = st.tabs(["📄 AUDITORÍA", "🛡️ APUESTA MAESTRA", "📊 PANEL DE CONTROL"])
 
 with t1:
-    st.info("Cruce de datos multimodal: Valida el rendimiento real contra tus simulaciones matemáticas.")
+    st.info("Valida tus simulaciones matemáticas con visión artificial y backtesting automático.")
     c1, c2 = st.columns(2)
-    with c1: pdfs = st.file_uploader("Informes PDF", type="pdf", accept_multiple_files=True)
-    with c2: imgs = st.file_uploader("Capturas Flashscore", type=["jpg", "png"], accept_multiple_files=True)
+    with c1: pdfs = st.file_uploader("Subir PDFs", type="pdf", accept_multiple_files=True)
+    with c2: imgs = st.file_uploader("Subir Capturas", type=["jpg", "png"], accept_multiple_files=True)
     
     if st.button("▶ INICIAR PROCESAMIENTO"):
         if not GEMINI_API_KEY:
-            st.error("⚠️ Debes configurar una API Key en la barra lateral.")
+            st.error("⚠️ Falta API Key.")
         elif pdfs and imgs and len(pdfs) == len(imgs):
             for i in range(len(pdfs)):
                 status_area = st.empty()
@@ -245,25 +213,27 @@ with t1:
                     try:
                         data = json.loads(res_raw)
                         row = {
-                            "partido": data['partido'], "pronostico": data['pronostico'],
-                            "marcador_final": data['marcador_final'], "estado": data['estado'],
-                            "tipo": "Individual", "analisis_tecnico": json.dumps(data)
+                            "partido": data.get('partido', 'Desconocido'), 
+                            "pronostico": data.get('pronostico', 'N/A'),
+                            "marcador_final": data.get('marcador_final', '?-?'), 
+                            "estado": data.get('estado', '⚪'),
+                            "tipo": "Individual", 
+                            "analisis_tecnico": json.dumps(data)
                         }
                         supabase.table("auditoria_apuestas").insert(row).execute()
-                        st.success(f"Auditado: {data['partido']}")
-                    except Exception as e: st.error(f"Error de parseo: {e}")
+                        st.success(f"Auditado: {row['partido']}")
+                    except Exception as e: st.error(f"Error JSON: {e}")
                 else:
-                    st.error(f"Error de API: {err}")
-                    add_log(f"Error en procesamiento: {err}", "error")
+                    st.error(f"Error: {err}")
         else:
-            st.warning("Carga pares iguales de archivos para auditar.")
+            st.warning("Carga pares iguales de archivos.")
 
     st.divider()
     with st.expander("🛠️ Consola de Sistema", expanded=True):
         logs = "\n".join(st.session_state.debug_logs[::-1])
         st.markdown(f'<div class="console-box">{logs}</div>', unsafe_allow_html=True)
 
-# --- TAB 3: DASHBOARD (PANEL DE CONTROL REFINADO) ---
+# --- TAB 3: DASHBOARD ---
 with t3:
     try:
         response = supabase.table("auditoria_apuestas").select("*").order("fecha", desc=True).execute()
@@ -272,60 +242,67 @@ with t3:
             df = pd.DataFrame(db_data)
             df['fecha'] = pd.to_datetime(df['fecha'])
             
-            # Métricas Superiores
+            # Métricas
             m1, m2, m3 = st.columns(3)
             hits = len(df[df['estado'].str.contains('🟢')])
-            m1.metric("Informes Auditados", len(df))
-            m2.metric("Tasa de Acierto", f"{(hits/len(df)*100 if len(df)>0 else 0):.1f}%")
-            m3.metric("Filtro de Seguridad", "🛡️ Nivel 5")
+            m1.metric("Informes Totales", len(df))
+            m2.metric("Acierto Estrategia", f"{(hits/len(df)*100 if len(df)>0 else 0):.1f}%")
+            m3.metric("Filtro IA", "🛡️ Activo")
             
             st.divider()
 
-            for index, row in df.iterrows():
-                # Validación de JSON para evitar crash
-                try:
-                    if not row['analisis_tecnico'] or row['analisis_tecnico'] == "":
-                        continue
-                    full_json = json.loads(row['analisis_tecnico'])
-                except:
-                    st.error(f"⚠️ Informe #{row['id']} tiene datos corruptos.")
-                    if st.button(f"Eliminar Informe Corrupto #{row['id']}", key=f"err_{row['id']}"):
-                        supabase.table("auditoria_apuestas").delete().eq("id", row['id']).execute()
-                        st.rerun()
-                    continue
+            valid_records = []
+            broken_records = []
 
+            # Separamos registros buenos de corruptos
+            for _, row in df.iterrows():
+                try:
+                    if row['analisis_tecnico']:
+                        json.loads(row['analisis_tecnico'])
+                        valid_records.append(row)
+                    else:
+                        broken_records.append(row)
+                except:
+                    broken_records.append(row)
+
+            # Mostramos los válidos
+            for row in valid_records:
+                full_json = json.loads(row['analisis_tecnico'])
                 with st.expander(f"{row['estado']} {row['partido']} | {row['fecha'].strftime('%d/%m %H:%M')}"):
                     ca, cb = st.columns([1, 1.5])
                     with ca:
-                        score = full_json.get('accuracy_score', 0)
-                        st.plotly_chart(render_accuracy_gauge(score, row['id']), use_container_width=True, key=f"gauge_{row['id']}")
-
+                        st.plotly_chart(render_accuracy_gauge(full_json.get('accuracy_score', 0), row['id']), use_container_width=True, key=f"g_{row['id']}")
                     with cb:
                         st.markdown("#### 🎫 Evaluación de Apuestas")
                         for b in full_json.get('apuestas_detalle', []):
-                            cls = "hit" if b["hit"] else "miss"
-                            icon = "✅" if b["hit"] else "❌"
-                            st.markdown(f'<div class="bet-card {cls}"><strong>{icon}</strong> {b["apuesta"]}</div>', unsafe_allow_html=True)
+                            st.markdown(f'<div class="bet-card {"hit" if b["hit"] else "miss"}">{"✅" if b["hit"] else "❌"} {b["apuesta"]}</div>', unsafe_allow_html=True)
                     
-                    st.markdown("#### 📉 Simulación vs Realidad")
-                    table_html = """<table class="modern-table"><thead><tr><th>Métrica</th><th>Predicción Informe</th><th>Resultado Imagen</th><th>OK</th></tr></thead><tbody>"""
+                    st.markdown("#### 📉 Comparativa de Métricas")
+                    comp_html = """<table style='width:100%; border-collapse:collapse;'><thead><tr style='border-bottom:1px solid #333;'><th style='text-align:left; padding:8px;'>Métrica</th><th style='padding:8px;'>Informe</th><th style='padding:8px;'>Real</th></tr></thead><tbody>"""
                     for m in full_json.get('comparativa_simulacion', []):
-                        icon = "🟢" if m['acerto'] else "🔴"
-                        table_html += f"<tr><td>{m['metrica']}</td><td>{m['informe']}</td><td>{m['real']}</td><td>{icon}</td></tr>"
-                    table_html += "</tbody></table>"
-                    st.markdown(table_html, unsafe_allow_html=True)
+                        comp_html += f"<tr style='border-bottom:1px solid #222;'><td style='padding:8px;'>{m['metrica']}</td><td style='text-align:center;'>{m['informe']}</td><td style='text-align:center;'>{m['real']} {'🟢' if m['acerto'] else '🔴'}</td></tr>"
+                    comp_html += "</tbody></table>"
+                    st.markdown(comp_html, unsafe_allow_html=True)
                     
-                    st.info(f"**Análisis:** {full_json.get('analisis_tecnico', 'Sin detalles técnicos.')}")
-                    
-                    # Botón de eliminación individual funcional
-                    if st.button(f"🗑️ Eliminar Registro #{row['id']}", key=f"btn_del_{row['id']}"):
+                    st.info(f"**Conclusión:** {full_json.get('analisis_tecnico', 'Finalizado.')}")
+                    if st.button(f"🗑️ Eliminar Informe #{row['id']}", key=f"del_{row['id']}"):
                         supabase.table("auditoria_apuestas").delete().eq("id", row['id']).execute()
-                        st.success("Eliminado.")
-                        time.sleep(0.5)
                         st.rerun()
-        else:
-            st.info("La base de datos está vacía. Inicia una auditoría para ver resultados.")
-    except Exception as e:
-        st.error(f"Fallo crítico: {e}")
 
-st.sidebar.caption("Quant/Sharp v8.2 | Reliability Mode")
+            # Sección especial para limpiar datos basura (lo que causa que veas 7 en el contador pero no en la UI)
+            if broken_records:
+                st.divider()
+                with st.expander("⚠️ Mantenimiento: Registros con Errores"):
+                    st.warning(f"Se encontraron {len(broken_records)} registros corruptos que afectan al contador.")
+                    for br in broken_records:
+                        col1, col2 = st.columns([3, 1])
+                        col1.write(f"Registro ID #{br['id']} (Fecha: {br['fecha']})")
+                        if col2.button("Eliminar Basura", key=f"br_{br['id']}"):
+                            supabase.table("auditoria_apuestas").delete().eq("id", br['id']).execute()
+                            st.rerun()
+        else:
+            st.info("Sin datos.")
+    except Exception as e:
+        st.error(f"Error de base de datos.")
+
+st.sidebar.caption("Quant/Sharp v8.3 | Dashboard Optimizado")
