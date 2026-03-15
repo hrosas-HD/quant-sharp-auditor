@@ -13,7 +13,7 @@ import random
 # CONFIGURACIÓN DE PÁGINA
 # =====================================================================
 st.set_page_config(
-    page_title="Quant/Sharp Auditor Pro v8.4",
+    page_title="Quant/Sharp Auditor Pro v8.5",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -26,7 +26,7 @@ if "debug_logs" not in st.session_state:
 def add_log(msg, type="info"):
     st.session_state.debug_logs.append(f"[{time.strftime('%H:%M:%S')}] [{type.upper()}] {msg}")
 
-# --- ESTILOS CSS PREMIUM (V8.4 - SMART LOADING) ---
+# --- ESTILOS CSS PREMIUM (V8.5 - CRITICAL FIX) ---
 st.markdown("""
     <style>
     .main { background-color: #0d1117; color: #c9d1d9; }
@@ -49,7 +49,7 @@ st.markdown("""
         background: #58a6ff;
         box-shadow: 0 0 15px #58a6ff;
         position: relative;
-        animation: scan 2s ease-in-out infinite;
+        animation: scan 1.5s ease-in-out infinite;
     }
     @keyframes scan {
         0% { transform: translateY(0); opacity: 0.2; }
@@ -59,7 +59,8 @@ st.markdown("""
     
     .loading-step { font-family: 'Courier New', monospace; color: #7ee787; margin-top: 20px; font-size: 1rem; }
     .timer-text { color: #f85149; font-size: 1.2rem; font-weight: bold; margin-top: 10px; }
-    
+    .quota-fatal { color: #ff7b72; background: rgba(255, 123, 114, 0.1); padding: 10px; border-radius: 5px; border: 1px solid #ff7b72; margin-top: 10px; text-align: center; }
+
     /* Tarjetas de Apuestas */
     .bet-card { background: #161b22; border-radius: 10px; padding: 12px; margin-bottom: 10px; border: 1px solid #30363d; }
     .hit { border-left: 5px solid #238636; }
@@ -67,7 +68,7 @@ st.markdown("""
     
     .console-box {
         background: #010409; color: #7ee787; padding: 15px; border-radius: 8px; border: 1px solid #30363d;
-        font-family: 'Courier New', monospace; height: 200px; overflow-y: auto; font-size: 0.85rem;
+        font-family: 'Courier New', monospace; height: 180px; overflow-y: auto; font-size: 0.85rem;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -134,19 +135,22 @@ with st.sidebar:
             st.error(f"Error al limpiar: {e}")
 
     st.divider()
-    st.caption("Quant/Sharp v8.4 | Anti-Freeze Quota System")
+    st.caption("Quant/Sharp v8.5 | High Performance & Fix")
 
 # =====================================================================
-# MOTOR DE IA CON CRONÓMETRO DE ESPERA
+# MOTOR DE IA CON DETECCIÓN DE LÍMITE DIARIO
 # =====================================================================
 
-def update_status_ui(placeholder, step_num, text, wait_secs=0):
+def update_status_ui(placeholder, step_num, text, wait_secs=0, is_fatal=False, fatal_msg=""):
     timer_html = f'<div class="timer-text">⏳ REINTENTO EN: {wait_secs}s</div>' if wait_secs > 0 else ""
+    fatal_html = f'<div class="quota-fatal">🛑 ERROR CRÍTICO: {fatal_msg}</div>' if is_fatal else ""
+    
     placeholder.markdown(f"""
         <div class="scanning-wrapper">
             <div class="scan-line"></div>
             <div class="loading-step">[{step_num}/4] {text}</div>
             {timer_html}
+            {fatal_html}
         </div>
     """, unsafe_allow_html=True)
 
@@ -173,17 +177,30 @@ def auditar_partido(pdf, img, model_choice, status_placeholder):
                 response = model.generate_content(partes)
                 return response.text, None
             except Exception as e:
-                err_msg = str(e)
+                err_msg = str(e).lower()
+                
+                # DETECCIÓN DE LÍMITE DIARIO
+                if "daily" in err_msg or "per day" in err_msg:
+                    msg = "Has agotado tu cuota DIARIA de Google AI. Esperar 60s no servirá. Prueba con otra API Key o cambia el motor IA en la barra lateral."
+                    update_status_ui(status_placeholder, 4, "Límite Diario Alcanzado", is_fatal=True, fatal_msg=msg)
+                    add_log("CUOTA DIARIA AGOTADA. Proceso abortado.", "error")
+                    return None, msg
+
                 if "429" in err_msg:
-                    add_log(f"Cuota agotada (Intento {retry+1}/{max_retries}).", "warning")
+                    if retry == max_retries - 1:
+                        msg = "La API sigue bloqueada tras varios intentos. Es posible que el límite diario esté cerca o la red esté saturada."
+                        return None, msg
+                    
+                    add_log(f"Cuota temporal agotada (Intento {retry+1}/{max_retries}). Esperando...", "warning")
                     # Cronómetro visual de 60 segundos
                     for remaining in range(60, 0, -1):
-                        update_status_ui(status_placeholder, 4, "Límite de API alcanzado. Esperando reinicio...", wait_secs=remaining)
+                        update_status_ui(status_placeholder, 4, "Límite de peticiones alcanzado. Esperando reinicio...", wait_secs=remaining)
                         time.sleep(1)
                     continue
-                return None, err_msg
+                
+                return None, str(e)
         
-        return None, "Se superaron los reintentos. Posible límite de cuota diario alcanzado."
+        return None, "Se superaron los reintentos automáticos."
                 
     except Exception as e:
         return None, str(e)
@@ -198,8 +215,8 @@ t1, t2, t3 = st.tabs(["📄 AUDITORÍA", "🛡️ APUESTA MAESTRA", "📊 PANEL 
 with t1:
     st.info("Cruce de datos multimodal: Valida tus simulaciones matemáticas con IA.")
     c1, c2 = st.columns(2)
-    with c1: pdfs = st.file_uploader("Informes PDF", type="pdf", accept_multiple_files=True)
-    with c2: imgs = st.file_uploader("Capturas Estadísticas", type=["jpg", "png"], accept_multiple_files=True)
+    with c1: pdfs = st.file_uploader("Subir PDFs", type="pdf", accept_multiple_files=True)
+    with c2: imgs = st.file_uploader("Subir Capturas", type=["jpg", "png"], accept_multiple_files=True)
     
     if st.button("▶ INICIAR PROCESAMIENTO"):
         if not GEMINI_API_KEY:
@@ -208,9 +225,9 @@ with t1:
             for i in range(len(pdfs)):
                 status_area = st.empty()
                 res_raw, err = auditar_partido(pdfs[i], imgs[i], model_option, status_area)
-                status_area.empty()
                 
                 if not err:
+                    status_area.empty()
                     try:
                         data = json.loads(res_raw)
                         row = {
@@ -226,8 +243,14 @@ with t1:
                         add_log(f"Procesado: {row['partido']}", "success")
                     except Exception as e: st.error(f"Error JSON: {e}")
                 else:
-                    st.error(f"Error Crítico: {err}")
+                    # No vaciamos el área de status si es un error fatal para que el usuario lea la explicación
+                    if "diaria" not in err.lower():
+                        status_area.empty()
+                    st.error(f"Error: {err}")
                     add_log(f"Fallo en procesamiento: {err}", "error")
+                    # Si es error de cuota diaria, dejamos de procesar el resto del lote
+                    if "diaria" in err.lower() or "daily" in err.lower():
+                        break
         else:
             st.warning("Carga pares iguales (1 PDF por cada 1 Imagen).")
 
@@ -291,7 +314,7 @@ with t3:
                         supabase.table("auditoria_apuestas").delete().eq("id", row['id']).execute()
                         st.rerun()
 
-            # Gestión de Basura
+            # Gestión de Basura (FANTASMAS)
             if broken_list:
                 st.divider()
                 with st.expander("⚠️ Limpieza de Registros Fantasma"):
@@ -307,4 +330,4 @@ with t3:
     except Exception as e:
         st.error(f"Error de base de datos.")
 
-st.sidebar.caption("Quant/Sharp v8.4 | High Performance")
+st.sidebar.caption("Quant/Sharp v8.5 | High Performance & Fix")
