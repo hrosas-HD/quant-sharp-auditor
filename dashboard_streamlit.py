@@ -13,7 +13,7 @@ import random
 # CONFIGURACIÓN DE PÁGINA
 # =====================================================================
 st.set_page_config(
-    page_title="Quant/Sharp Auditor Pro v8.6",
+    page_title="Quant/Sharp Auditor Pro v8.7",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -28,45 +28,23 @@ if "exhausted_models" not in st.session_state:
 def add_log(msg, type="info"):
     st.session_state.debug_logs.append(f"[{time.strftime('%H:%M:%S')}] [{type.upper()}] {msg}")
 
-# --- ESTILOS CSS PREMIUM (V8.6 - QUOTA RECOVERY) ---
+# --- ESTILOS CSS PREMIUM ---
 st.markdown("""
     <style>
     .main { background-color: #0d1117; color: #c9d1d9; }
-    
-    /* Animación de Escaneo */
     .scanning-wrapper {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 30px;
-        background: rgba(22, 27, 34, 0.8);
-        border-radius: 15px;
-        border: 1px solid #30363d;
-        margin: 20px 0;
+        display: flex; flex-direction: column; align-items: center; padding: 30px;
+        background: rgba(22, 27, 34, 0.8); border-radius: 15px; border: 1px solid #30363d; margin: 20px 0;
     }
     .scan-line {
-        width: 100%;
-        height: 3px;
-        background: #58a6ff;
-        box-shadow: 0 0 15px #58a6ff;
-        position: relative;
-        animation: scan 1.5s ease-in-out infinite;
+        width: 100%; height: 3px; background: #58a6ff; box-shadow: 0 0 15px #58a6ff;
+        position: relative; animation: scan 1.5s ease-in-out infinite;
     }
-    @keyframes scan {
-        0% { transform: translateY(0); opacity: 0.2; }
-        50% { transform: translateY(40px); opacity: 1; }
-        100% { transform: translateY(0); opacity: 0.2; }
-    }
-    
+    @keyframes scan { 0% { transform: translateY(0); opacity: 0.2; } 50% { transform: translateY(40px); opacity: 1; } 100% { transform: translateY(0); opacity: 0.2; } }
     .loading-step { font-family: 'Courier New', monospace; color: #7ee787; margin-top: 20px; font-size: 1rem; }
-    .timer-text { color: #f85149; font-size: 1.2rem; font-weight: bold; margin-top: 10px; }
-    .quota-fatal { color: #ff7b72; background: rgba(255, 123, 114, 0.1); padding: 15px; border-radius: 8px; border: 1px solid #ff7b72; margin-top: 10px; text-align: center; }
-
-    /* Tarjetas de Apuestas */
     .bet-card { background: #161b22; border-radius: 10px; padding: 12px; margin-bottom: 10px; border: 1px solid #30363d; }
     .hit { border-left: 5px solid #238636; }
     .miss { border-left: 5px solid #da3633; }
-    
     .console-box {
         background: #010409; color: #7ee787; padding: 15px; border-radius: 8px; border: 1px solid #30363d;
         font-family: 'Courier New', monospace; height: 180px; overflow-y: auto; font-size: 0.85rem;
@@ -80,146 +58,82 @@ SUPABASE_KEY = "sb_publishable_4SX3y_184dNOObMxbRTIYA_3qSbfYUt"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # =====================================================================
-# COMPONENTES VISUALES
-# =====================================================================
-
-def render_accuracy_gauge(score, key_id):
-    fig = go.Figure(go.Indicator(
-        mode = "gauge+number",
-        value = score,
-        title = {'text': "Confianza del Modelo", 'font': {'size': 14, 'color': "#8b949e"}},
-        number = {'suffix': "%", 'font': {'size': 35, 'color': "#ffffff"}},
-        gauge = {
-            'axis': {'range': [0, 100], 'tickcolor': "#30363d"},
-            'bar': {'color': "#58a6ff"},
-            'bgcolor': "rgba(0,0,0,0)",
-            'steps': [
-                {'range': [0, 40], 'color': 'rgba(218, 54, 51, 0.2)'},
-                {'range': [40, 75], 'color': 'rgba(210, 153, 34, 0.2)'},
-                {'range': [75, 100], 'color': 'rgba(35, 134, 54, 0.2)'}
-            ]
-        }
-    ))
-    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=180, margin=dict(t=30, b=0, l=10, r=10))
-    return fig
-
-# =====================================================================
 # BARRA LATERAL (CENTRO DE COMANDO)
 # =====================================================================
 with st.sidebar:
     st.header("⚙️ Centro de Comando")
-    manual_key = st.text_input("🔑 Gemini API Key:", type="password", help="Si el límite diario se agota, cambia a otra cuenta de Google.")
+    manual_key = st.text_input("🔑 Gemini API Key:", type="password")
     
-    # Lista de modelos con indicadores de estado
     model_options = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-flash-latest"]
-    display_options = [f"{m} {' (⚠️ AGOTADO Hoy)' if m in st.session_state.exhausted_models else ''}" for m in model_options]
-    
-    model_selection = st.selectbox("Motor IA:", options=display_options, index=0)
-    model_option = model_selection.split(' ')[0] # Extraer nombre limpio del modelo
+    display_opts = [f"{m} {' (⚠️ AGOTADO)' if m in st.session_state.exhausted_models else ''}" for m in model_options]
+    model_selection = st.selectbox("Motor IA:", options=display_opts, index=0)
+    model_option = model_selection.split(' ')[0]
     
     GEMINI_API_KEY = manual_key if manual_key else st.secrets.get("GEMINI_API_KEY", "")
     
     if GEMINI_API_KEY:
         try:
             genai.configure(api_key=GEMINI_API_KEY)
-            if st.button("🧪 Probar Conexión API"):
+            if st.button("🧪 Probar Conexión"):
                 genai.list_models()
-                st.success("Conexión Estable ✅")
-                add_log(f"API Key validada para {model_option}.", "success")
+                st.success("Enlace Estable ✅")
+                add_log(f"Clave validada para {model_option}", "success")
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error(f"Error de clave: {e}")
 
     st.divider()
-    st.subheader("🧹 Mantenimiento")
-    if st.button("🔴 Borrado Maestro (Reiniciar Base)"):
-        try:
-            supabase.table("auditoria_apuestas").delete().neq("id", 0).execute()
-            st.success("Base de datos limpia.")
-            add_log("Borrado maestro ejecutado.", "warning")
-            time.sleep(1)
-            st.rerun()
-        except Exception as e:
-            st.error(f"Error al limpiar: {e}")
+    if st.button("🔴 Borrado Maestro"):
+        supabase.table("auditoria_apuestas").delete().neq("id", 0).execute()
+        st.success("Base limpia.")
+        st.rerun()
 
-    st.divider()
-    st.caption("Quant/Sharp v8.6 | Quota-Safe Engine")
+    st.caption("Quant/Sharp v8.7 | JSON Recovery")
 
 # =====================================================================
-# MOTOR DE IA CON MANEJO DE BLOQUEO DE MOTOR
+# MOTOR DE IA CON ROBUSTEZ DE DATOS
 # =====================================================================
 
-def update_status_ui(placeholder, step_num, text, wait_secs=0, is_fatal=False, fatal_msg=""):
-    timer_html = f'<div class="timer-text">⏳ REINTENTO EN: {wait_secs}s</div>' if wait_secs > 0 else ""
-    fatal_html = f'<div class="quota-fatal">🛑 {fatal_msg}</div>' if is_fatal else ""
-    
+def update_status_ui(placeholder, step_num, text, wait_secs=0):
+    timer = f'<div style="color:#f85149">⏳ REINTENTO EN: {wait_secs}s</div>' if wait_secs > 0 else ""
     placeholder.markdown(f"""
         <div class="scanning-wrapper">
             <div class="scan-line"></div>
             <div class="loading-step">[{step_num}/4] {text}</div>
-            {timer_html}
-            {fatal_html}
+            {timer}
         </div>
     """, unsafe_allow_html=True)
 
 def auditar_partido(pdf, img, model_choice, status_placeholder):
-    # Verificación preventiva si el modelo ya está marcado como agotado
-    if model_choice in st.session_state.exhausted_models:
-        return None, f"El motor {model_choice} está agotado por hoy. Por favor, selecciona un motor diferente en la barra lateral."
-
     try:
         model = genai.GenerativeModel(model_name=model_choice, generation_config={"response_mime_type": "application/json"})
-        
-        update_status_ui(status_placeholder, 1, "Analizando informe PDF...")
-        time.sleep(1)
-        update_status_ui(status_placeholder, 2, "Escaneando imagen estadística...")
-        time.sleep(1)
-        update_status_ui(status_placeholder, 3, "Preparando cruce de datos...")
+        update_status_ui(status_placeholder, 1, "Leyendo PDF...")
+        time.sleep(0.5)
+        update_status_ui(status_placeholder, 2, "Procesando Imagen...")
+        time.sleep(0.5)
+        update_status_ui(status_placeholder, 3, "Cruzando métricas...")
 
         prompt = """
-        [ROLE] Auditor Deportivo IA. Cruza el PDF con la Imagen. Calcula accuracy_score (0-100).
-        [JSON] { "partido": "string", "pronostico": "string", "marcador_final": "string", "estado": "🟢/🔴", "accuracy_score": int, "apuestas_detalle": [{"apuesta": "string", "hit": bool}], "comparativa_simulacion": [{"metrica": "string", "informe": "string", "real": "string", "acerto": bool}], "analisis_tecnico": "Markdown" }
+        Analiza PDF vs Imagen. Devuelve JSON:
+        { "partido": "string", "pronostico": "string", "marcador_final": "string", "estado": "🟢/🔴", "accuracy_score": int, 
+          "apuestas_detalle": [{"apuesta": "string", "hit": bool}], 
+          "comparativa_simulacion": [{"metrica": "string", "informe": "string", "real": "string", "acerto": bool}], "analisis_tecnico": "Markdown" }
         """
         partes = [prompt, {"mime_type": "application/pdf", "data": pdf.getvalue()}, {"mime_type": "image/png", "data": img.getvalue()}]
         
-        max_retries = 3
-        for retry in range(max_retries):
+        for retry in range(3):
             try:
-                update_status_ui(status_placeholder, 4, "Sincronizando reporte final...")
+                update_status_ui(status_placeholder, 4, "Finalizando...")
                 response = model.generate_content(partes)
                 return response.text, None
             except Exception as e:
-                err_msg = str(e).lower()
-                
-                # DETECCIÓN DE LÍMITE DIARIO / AGOTAMIENTO
-                if "daily" in err_msg or "per day" in err_msg:
-                    if model_choice not in st.session_state.exhausted_models:
-                        st.session_state.exhausted_models.append(model_choice)
-                    msg = f"CUOTA DIARIA AGOTADA para {model_choice}. Cambia a otro motor en la barra lateral."
-                    update_status_ui(status_placeholder, 4, "Límite Diario Alcanzado", is_fatal=True, fatal_msg=msg)
-                    add_log(f"Motor {model_choice} agotado por hoy.", "error")
-                    return None, "DAILY_LIMIT_REACHED"
-
-                if "429" in err_msg:
-                    if retry == max_retries - 1:
-                        # Si tras 3 intentos con esperas de 60s sigue fallando, lo marcamos como bloqueado
-                        if model_choice not in st.session_state.exhausted_models:
-                            st.session_state.exhausted_models.append(model_choice)
-                        msg = "La API sigue bloqueada. Se ha marcado este modelo como 'Agotado'. Cambia de motor o de clave."
-                        update_status_ui(status_placeholder, 4, "Saturación Persistente", is_fatal=True, fatal_msg=msg)
-                        return None, "PERSISTENT_429"
-                    
-                    add_log(f"Límite excedido (Intento {retry+1}). Reintentando en 60s...", "warning")
+                if "429" in str(e):
                     for r in range(60, 0, -1):
-                        update_status_ui(status_placeholder, 4, "Límite de peticiones. Esperando reinicio...", wait_secs=r)
+                        update_status_ui(status_placeholder, 4, "Cuota agotada, esperando...", wait_secs=r)
                         time.sleep(1)
                     continue
-                
                 return None, str(e)
-        
-        return None, "Fallo técnico tras reintentos."
-                
-    except Exception as e:
-        return None, str(e)
+        return None, "Límite de intentos."
+    except Exception as e: return None, str(e)
 
 # =====================================================================
 # INTERFAZ PRINCIPAL
@@ -229,120 +143,81 @@ st.title("🎯 Quant/Sharp Auditor Pro")
 t1, t2, t3 = st.tabs(["📄 AUDITORÍA", "🛡️ APUESTA MAESTRA", "📊 PANEL DE CONTROL"])
 
 with t1:
-    st.info("Cruce de datos multimodal: Valida tus simulaciones matemáticas con IA.")
     c1, c2 = st.columns(2)
-    with c1: pdfs = st.file_uploader("Subir Informes PDF", type="pdf", accept_multiple_files=True)
-    with c2: imgs = st.file_uploader("Subir Capturas", type=["jpg", "png"], accept_multiple_files=True)
+    with c1: pdfs = st.file_uploader("PDFs", type="pdf", accept_multiple_files=True)
+    with c2: imgs = st.file_uploader("Capturas", type=["jpg", "png"], accept_multiple_files=True)
     
-    if st.button("▶ INICIAR PROCESAMIENTO"):
-        if model_option in st.session_state.exhausted_models:
-            st.error(f"❌ El motor {model_option} está marcado como agotado. Cambia a otro en la barra lateral.")
-        elif not GEMINI_API_KEY:
-            st.error("⚠️ Falta API Key.")
-        elif pdfs and imgs and len(pdfs) == len(imgs):
+    if st.button("▶ INICIAR"):
+        if pdfs and imgs and len(pdfs) == len(imgs):
             for i in range(len(pdfs)):
                 status_area = st.empty()
                 res_raw, err = auditar_partido(pdfs[i], imgs[i], model_option, status_area)
+                status_area.empty()
                 
                 if not err:
-                    status_area.empty()
                     try:
-                        data = json.loads(res_raw)
+                        # --- FIX CRÍTICO PARA EL ERROR 'LIST' OBJECT ---
+                        raw_data = json.loads(res_raw)
+                        # Si la IA devuelve una lista [{...}], extraemos el primer elemento
+                        data = raw_data[0] if isinstance(raw_data, list) else raw_data
+                        
                         row = {
-                            "partido": data.get('partido', 'Desconocido'), 
+                            "partido": data.get('partido', 'Desconocido'),
                             "pronostico": data.get('pronostico', 'N/A'),
-                            "marcador_final": data.get('marcador_final', '?-?'), 
+                            "marcador_final": data.get('marcador_final', '?-?'),
                             "estado": data.get('estado', '⚪'),
-                            "tipo": "Individual", 
+                            "tipo": "Individual",
                             "analisis_tecnico": json.dumps(data)
                         }
                         supabase.table("auditoria_apuestas").insert(row).execute()
-                        st.success(f"Auditado con éxito: {row['partido']}")
-                        add_log(f"Procesado: {row['partido']}", "success")
-                    except Exception as e: st.error(f"Error JSON: {e}")
-                else:
-                    if err not in ["DAILY_LIMIT_REACHED", "PERSISTENT_429"]:
-                        status_area.empty()
-                        st.error(f"Error: {err}")
-                    add_log(f"Fallo en procesamiento: {err}", "error")
-                    if err in ["DAILY_LIMIT_REACHED", "PERSISTENT_429"]:
-                        break # Paramos el lote si el motor murió
-        else:
-            st.warning("Carga pares iguales (1 PDF por cada 1 Imagen).")
+                        st.success(f"Auditado: {row['partido']}")
+                    except Exception as e:
+                        st.error(f"Fallo al procesar respuesta de IA: {e}")
+                else: st.error(err)
+        else: st.warning("Carga archivos emparejados.")
 
     st.divider()
-    with st.expander("🛠️ Consola de Sistema", expanded=True):
+    with st.expander("🛠️ Consola", expanded=True):
         logs = "\n".join(st.session_state.debug_logs[::-1])
         st.markdown(f'<div class="console-box">{logs}</div>', unsafe_allow_html=True)
 
 # --- TAB 3: DASHBOARD ---
 with t3:
     try:
-        response = supabase.table("auditoria_apuestas").select("*").order("fecha", desc=True).execute()
-        db_data = response.data
-        if db_data:
-            df = pd.DataFrame(db_data)
+        res = supabase.table("auditoria_apuestas").select("*").order("fecha", desc=True).execute()
+        if res.data:
+            df = pd.DataFrame(res.data)
             df['fecha'] = pd.to_datetime(df['fecha'])
             
-            # Métricas
             m1, m2, m3 = st.columns(3)
             hits = len(df[df['estado'].str.contains('🟢')])
-            m1.metric("Informes Auditados", len(df))
-            m2.metric("Acierto Estrategia", f"{(hits/len(df)*100 if len(df)>0 else 0):.1f}%")
-            m3.metric("Protección IA", "🛡️ Activa")
+            m1.metric("Informes", len(df))
+            m2.metric("Acierto", f"{(hits/len(df)*100 if len(df)>0 else 0):.1f}%")
+            m3.metric("Riesgo", "🛡️ Activo")
             
             st.divider()
 
-            valid_list = []
-            broken_list = []
-
             for _, row in df.iterrows():
                 try:
-                    if row['analisis_tecnico'] and len(row['analisis_tecnico']) > 10:
-                        json.loads(row['analisis_tecnico'])
-                        valid_list.append(row)
-                    else:
-                        broken_list.append(row)
+                    # Validación de JSON antes de renderizar
+                    if not row['analisis_tecnico']: continue
+                    full_json = json.loads(row['analisis_tecnico'])
+                    # Doble check si el JSON interno también es una lista
+                    data = full_json[0] if isinstance(full_json, list) else full_json
+                    
+                    with st.expander(f"{row['estado']} {row['partido']} | {row['fecha'].strftime('%d/%m %H:%M')}"):
+                        ca, cb = st.columns([1, 2])
+                        with ca:
+                            st.write(f"**Confianza:** {data.get('accuracy_score', 0)}%")
+                            if st.button("🗑️ Borrar", key=f"del_{row['id']}"):
+                                supabase.table("auditoria_apuestas").delete().eq("id", row['id']).execute()
+                                st.rerun()
+                        with cb:
+                            for b in data.get('apuestas_detalle', []):
+                                st.markdown(f'{"✅" if b["hit"] else "❌"} {b["apuesta"]}')
                 except:
-                    broken_list.append(row)
-
-            for row in valid_list:
-                full_json = json.loads(row['analisis_tecnico'])
-                with st.expander(f"{row['estado']} {row['partido']} | {row['fecha'].strftime('%d/%m %H:%M')}"):
-                    ca, cb = st.columns([1, 1.5])
-                    with ca:
-                        st.plotly_chart(render_accuracy_gauge(full_json.get('accuracy_score', 0), row['id']), use_container_width=True, key=f"g_{row['id']}")
-                    with cb:
-                        st.markdown("#### 🎫 Evaluación de Apuestas")
-                        for b in full_json.get('apuestas_detalle', []):
-                            st.markdown(f'<div class="bet-card {"hit" if b["hit"] else "miss"}">{"✅" if b["hit"] else "❌"} {b["apuesta"]}</div>', unsafe_allow_html=True)
-                    
-                    st.markdown("#### 📉 Simulación vs Realidad")
-                    comp_html = """<table style='width:100%; border-collapse:collapse; margin-bottom:15px;'><thead><tr style='border-bottom:1px solid #333;'><th style='text-align:left; padding:8px;'>Métrica</th><th style='padding:8px;'>Informe</th><th style='padding:8px;'>Real</th></tr></thead><tbody>"""
-                    for m in full_json.get('comparativa_simulacion', []):
-                        comp_html += f"<tr style='border-bottom:1px solid #222;'><td style='padding:8px;'>{m['metrica']}</td><td style='text-align:center;'>{m['informe']}</td><td style='text-align:center;'>{m['real']} {'🟢' if m['acerto'] else '🔴'}</td></tr>"
-                    comp_html += "</tbody></table>"
-                    st.markdown(comp_html, unsafe_allow_html=True)
-                    
-                    st.info(f"**Análisis:** {full_json.get('analisis_tecnico', 'Finalizado.')}")
-                    if st.button(f"🗑️ Eliminar Registro #{row['id']}", key=f"del_{row['id']}"):
+                    if st.button(f"Limpiar Registro Corrupto #{row['id']}", key=f"fix_{row['id']}"):
                         supabase.table("auditoria_apuestas").delete().eq("id", row['id']).execute()
                         st.rerun()
-
-            # Gestión de Basura (FANTASMAS)
-            if broken_list:
-                st.divider()
-                with st.expander("⚠️ Limpieza de Registros Fantasma"):
-                    st.warning(f"Se detectaron {len(broken_list)} registros corruptos inflando el contador.")
-                    for br in broken_list:
-                        c1, c2 = st.columns([4, 1])
-                        c1.write(f"ID #{br['id']} | Fecha: {br['fecha']}")
-                        if c2.button("Borrar", key=f"fix_{br['id']}"):
-                            supabase.table("auditoria_apuestas").delete().eq("id", br['id']).execute()
-                            st.rerun()
-        else:
-            st.info("La base de datos está vacía.")
-    except Exception as e:
-        st.error(f"Error de conexión con la base de datos.")
-
-st.sidebar.caption("Quant/Sharp v8.6 | Quota-Safe Mode")
+        else: st.info("Vacio.")
+    except: st.error("Error DB.")
