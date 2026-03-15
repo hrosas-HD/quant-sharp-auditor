@@ -1,13 +1,9 @@
 import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
-import plotly.express as px
-import plotly.graph_objects as go
 import google.generativeai as genai
-import re
 import json
 import time
-import random
 
 # =====================================================================
 # CONFIGURACIÓN DE PÁGINA
@@ -52,10 +48,15 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- CONEXIÓN A APIS ---
-SUPABASE_URL = "https://tnxhmhoczcbfmhieaxgt.supabase.co"
-SUPABASE_KEY = "sb_publishable_4SX3y_184dNOObMxbRTIYA_3qSbfYUt"
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+# --- CONEXIÓN A APIS (SEGURA) ---
+# Requiere configurar st.secrets (ej: secrets.toml)
+SUPABASE_URL = st.secrets.get("SUPABASE_URL", "URL_POR_DEFECTO_SI_NO_EXISTE")
+SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "KEY_POR_DEFECTO_SI_NO_EXISTE")
+
+try:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+except Exception as e:
+    st.error(f"Error inicializando Supabase: Verifica tus secrets. {e}")
 
 # =====================================================================
 # BARRA LATERAL (CENTRO DE COMANDO)
@@ -75,17 +76,20 @@ with st.sidebar:
         try:
             genai.configure(api_key=GEMINI_API_KEY)
             if st.button("🧪 Probar Conexión"):
-                genai.list_models()
+                genai.list_models() # Fuerza una llamada ligera a la API
                 st.success("Enlace Estable ✅")
                 add_log(f"Clave validada para {model_option}", "success")
         except Exception as e:
-            st.error(f"Error de clave: {e}")
+            st.error(f"Error de clave Gemini: {e}")
 
     st.divider()
     if st.button("🔴 Borrado Maestro"):
-        supabase.table("auditoria_apuestas").delete().neq("id", 0).execute()
-        st.success("Base limpia.")
-        st.rerun()
+        try:
+            supabase.table("auditoria_apuestas").delete().neq("id", 0).execute()
+            st.success("Base limpia.")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Error al borrar DB: {e}")
 
     st.caption("Quant/Sharp v8.7 | JSON Recovery")
 
@@ -113,27 +117,37 @@ def auditar_partido(pdf, img, model_choice, status_placeholder):
         update_status_ui(status_placeholder, 3, "Cruzando métricas...")
 
         prompt = """
-        Analiza PDF vs Imagen. Devuelve JSON:
-        { "partido": "string", "pronostico": "string", "marcador_final": "string", "estado": "🟢/🔴", "accuracy_score": int, 
-          "apuestas_detalle": [{"apuesta": "string", "hit": bool}], 
-          "comparativa_simulacion": [{"metrica": "string", "informe": "string", "real": "string", "acerto": bool}], "analisis_tecnico": "Markdown" }
+        Analiza PDF vs Imagen. Devuelve JSON estrictamente con esta estructura:
+        { "partido": "string", "pronostico": "string", "marcador_final": "string", "estado": "🟢 o 🔴", "accuracy_score": int, 
+          "apuestas_detalle": [{"apuesta": "string", "hit": true/false}], 
+          "comparativa_simulacion": [{"metrica": "string", "informe": "string", "real": "string", "acerto": true/false}], "analisis_tecnico": "Markdown" }
         """
-        partes = [prompt, {"mime_type": "application/pdf", "data": pdf.getvalue()}, {"mime_type": "image/png", "data": img.getvalue()}]
+        
+        # FIX: Mime type dinámico según la imagen subida (PNG/JPEG)
+        img_mime_type = img.type if img.type else "image/png"
+        
+        partes = [
+            prompt, 
+            {"mime_type": "application/pdf", "data": pdf.getvalue()}, 
+            {"mime_type": img_mime_type, "data": img.getvalue()}
+        ]
         
         for retry in range(3):
             try:
-                update_status_ui(status_placeholder, 4, "Finalizando...")
+                update_status_ui(status_placeholder, 4, "Finalizando inferencia...")
                 response = model.generate_content(partes)
                 return response.text, None
             except Exception as e:
-                if "429" in str(e):
+                error_str = str(e)
+                if "429" in error_str:
                     for r in range(60, 0, -1):
-                        update_status_ui(status_placeholder, 4, "Cuota agotada, esperando...", wait_secs=r)
+                        update_status_ui(status_placeholder, 4, "Cuota de API agotada, esperando...", wait_secs=r)
                         time.sleep(1)
                     continue
-                return None, str(e)
-        return None, "Límite de intentos."
-    except Exception as e: return None, str(e)
+                return None, error_str
+        return None, "Límite de intentos superado por error 429."
+    except Exception as e: 
+        return None, str(e)
 
 # =====================================================================
 # INTERFAZ PRINCIPAL
@@ -142,10 +156,11 @@ st.title("🎯 Quant/Sharp Auditor Pro")
 
 t1, t2, t3 = st.tabs(["📄 AUDITORÍA", "🛡️ APUESTA MAESTRA", "📊 PANEL DE CONTROL"])
 
+# --- TAB 1: AUDITORÍA ---
 with t1:
     c1, c2 = st.columns(2)
     with c1: pdfs = st.file_uploader("PDFs", type="pdf", accept_multiple_files=True)
-    with c2: imgs = st.file_uploader("Capturas", type=["jpg", "png"], accept_multiple_files=True)
+    with c2: imgs = st.file_uploader("Capturas", type=["jpg", "jpeg", "png"], accept_multiple_files=True)
     
     if st.button("▶ INICIAR"):
         if pdfs and imgs and len(pdfs) == len(imgs):
@@ -154,11 +169,9 @@ with t1:
                 res_raw, err = auditar_partido(pdfs[i], imgs[i], model_option, status_area)
                 status_area.empty()
                 
-                if not err:
+                if not err and res_raw:
                     try:
-                        # --- FIX CRÍTICO PARA EL ERROR 'LIST' OBJECT ---
                         raw_data = json.loads(res_raw)
-                        # Si la IA devuelve una lista [{...}], extraemos el primer elemento
                         data = raw_data[0] if isinstance(raw_data, list) else raw_data
                         
                         row = {
@@ -170,19 +183,31 @@ with t1:
                             "analisis_tecnico": json.dumps(data)
                         }
                         supabase.table("auditoria_apuestas").insert(row).execute()
-                        st.success(f"Auditado: {row['partido']}")
+                        st.success(f"Auditado con éxito: {row['partido']}")
+                    except json.JSONDecodeError:
+                        st.error(f"Fallo al interpretar el JSON de la IA. Respuesta cruda: {res_raw}")
                     except Exception as e:
-                        st.error(f"Fallo al procesar respuesta de IA: {e}")
-                else: st.error(err)
-        else: st.warning("Carga archivos emparejados.")
+                        st.error(f"Error al guardar en BD: {e}")
+                else: 
+                    st.error(f"Error en inferencia: {err}")
+        else: 
+            st.warning("Asegúrate de cargar exactamente la misma cantidad de PDFs y Capturas para emparejarlos.")
 
     st.divider()
-    with st.expander("🛠️ Consola", expanded=True):
+    with st.expander("🛠️ Consola de Depuración", expanded=False):
         logs = "\n".join(st.session_state.debug_logs[::-1])
-        st.markdown(f'<div class="console-box">{logs}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="console-box">{logs if logs else "Sin registros."}</div>', unsafe_allow_html=True)
+
+# --- TAB 2: APUESTA MAESTRA (Añadido) ---
+with t2:
+    st.subheader("🛡️ Gestión de Apuestas Maestras")
+    st.info("Módulo en desarrollo. Aquí puedes agregar lógica para combinar métricas cruzadas.")
 
 # --- TAB 3: DASHBOARD ---
 with t3:
+    if st.button("🔄 Refrescar Datos"):
+        st.rerun()
+        
     try:
         res = supabase.table("auditoria_apuestas").select("*").order("fecha", desc=True).execute()
         if res.data:
@@ -190,34 +215,39 @@ with t3:
             df['fecha'] = pd.to_datetime(df['fecha'])
             
             m1, m2, m3 = st.columns(3)
-            hits = len(df[df['estado'].str.contains('🟢')])
-            m1.metric("Informes", len(df))
-            m2.metric("Acierto", f"{(hits/len(df)*100 if len(df)>0 else 0):.1f}%")
+            # FIX: Convertimos a string por seguridad antes de hacer str.contains
+            hits = len(df[df['estado'].astype(str).str.contains('🟢', na=False)])
+            m1.metric("Informes Auditados", len(df))
+            m2.metric("Tasa de Acierto", f"{(hits/len(df)*100 if len(df)>0 else 0):.1f}%")
             m3.metric("Riesgo", "🛡️ Activo")
             
             st.divider()
 
             for _, row in df.iterrows():
                 try:
-                    # Validación de JSON antes de renderizar
                     if not row['analisis_tecnico']: continue
                     full_json = json.loads(row['analisis_tecnico'])
-                    # Doble check si el JSON interno también es una lista
                     data = full_json[0] if isinstance(full_json, list) else full_json
                     
-                    with st.expander(f"{row['estado']} {row['partido']} | {row['fecha'].strftime('%d/%m %H:%M')}"):
+                    with st.expander(f"{row.get('estado', '⚪')} {row.get('partido', 'Unknown')} | {row['fecha'].strftime('%d/%m %H:%M')}"):
                         ca, cb = st.columns([1, 2])
                         with ca:
-                            st.write(f"**Confianza:** {data.get('accuracy_score', 0)}%")
+                            st.write(f"**Confianza IA:** {data.get('accuracy_score', 0)}%")
                             if st.button("🗑️ Borrar", key=f"del_{row['id']}"):
                                 supabase.table("auditoria_apuestas").delete().eq("id", row['id']).execute()
                                 st.rerun()
                         with cb:
                             for b in data.get('apuestas_detalle', []):
-                                st.markdown(f'{"✅" if b["hit"] else "❌"} {b["apuesta"]}')
-                except:
-                    if st.button(f"Limpiar Registro Corrupto #{row['id']}", key=f"fix_{row['id']}"):
+                                # Usamos .get() para evitar KeyErrors si el JSON viene deformado
+                                is_hit = b.get("hit", False)
+                                txt_apuesta = b.get("apuesta", "Detalle desconocido")
+                                st.markdown(f'{"✅" if is_hit else "❌"} {txt_apuesta}')
+                except Exception as e:
+                    st.error(f"Fila ID {row.get('id')} corrupta.")
+                    if st.button(f"Limpiar Registro #{row.get('id')}", key=f"fix_{row.get('id')}"):
                         supabase.table("auditoria_apuestas").delete().eq("id", row['id']).execute()
                         st.rerun()
-        else: st.info("Vacio.")
-    except: st.error("Error DB.")
+        else: 
+            st.info("Base de datos vacía. Realiza tu primera auditoría.")
+    except Exception as e: 
+        st.error(f"Error de conexión con Supabase o procesando DB: {e}")
