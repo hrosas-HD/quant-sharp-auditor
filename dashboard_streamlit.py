@@ -13,11 +13,19 @@ import random
 # CONFIGURACIÓN DE PÁGINA
 # =====================================================================
 st.set_page_config(
-    page_title="Quant/Sharp Auditor Pro v7.1",
+    page_title="Quant/Sharp Auditor Pro v7.2",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# --- INICIALIZACIÓN DE ESTADO DE SESIÓN PARA LOGS ---
+if "debug_logs" not in st.session_state:
+    st.session_state.debug_logs = []
+
+def add_log(msg, type="info"):
+    timestamp = time.strftime("%H:%M:%S")
+    st.session_state.debug_logs.append(f"[{timestamp}] [{type.upper()}] {msg}")
 
 # --- ESTILOS CSS PERSONALIZADOS (LOOK PREMIUM) ---
 st.markdown("""
@@ -56,6 +64,17 @@ st.markdown("""
         background-color: #1f6feb !important;
         color: white !important;
     }
+    .console-box {
+        background-color: #000;
+        color: #0f0;
+        font-family: 'Courier New', Courier, monospace;
+        padding: 10px;
+        border-radius: 5px;
+        height: 200px;
+        overflow-y: scroll;
+        font-size: 0.8rem;
+        border: 1px solid #333;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -69,17 +88,14 @@ SUPABASE_KEY = "sb_publishable_4SX3y_184dNOObMxbRTIYA_3qSbfYUt"
 with st.sidebar:
     st.header("⚙️ Configuración Crítica")
     
-    # Entrada manual de clave para evitar el error "Expired" por filtración en código
     manual_key = st.text_input("🔑 Gemini API Key (Manual):", type="password", help="Pega aquí tu nueva clave si la anterior expiró.")
     
-    # Selección de modelo
     model_option = st.selectbox(
         "Motor de Inteligencia:",
         ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-flash-latest"],
         index=0
     )
 
-    # Lógica de obtención de clave
     GEMINI_API_KEY = manual_key if manual_key else st.secrets.get("GEMINI_API_KEY", "")
 
     if GEMINI_API_KEY:
@@ -88,13 +104,19 @@ with st.sidebar:
             if st.button("🔍 Probar Validez de Clave"):
                 models = [m.name for m in genai.list_models()]
                 st.success("✅ Clave Activa y Funcional")
+                add_log("Prueba de conexión exitosa.", "success")
         except Exception as e:
             st.error(f"❌ Error de Clave: {e}")
+            add_log(f"Fallo en prueba de conexión: {str(e)}", "error")
     else:
-        st.warning("⚠️ Sin clave configurada. Agrégala arriba o en los Secrets.")
+        st.warning("⚠️ Sin clave configurada.")
+
+    if st.button("🗑️ Limpiar Consola"):
+        st.session_state.debug_logs = []
+        st.rerun()
 
     st.divider()
-    st.caption("v7.1 | Sistema Anti-Expiración")
+    st.caption("v7.2 | Sistema de Auditoría con Log")
 
 # Inicialización de Supabase
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -103,7 +125,6 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # LÓGICA DE IA CON CONTROL DE ROBUSTEZ
 # =====================================================================
 def call_gemini_with_retry(model_name, parts, max_retries=3):
-    """Llamada a Gemini con reintentos para manejar errores 429 y 404"""
     if not GEMINI_API_KEY:
         return None, "No hay API Key configurada."
         
@@ -115,22 +136,27 @@ def call_gemini_with_retry(model_name, parts, max_retries=3):
         
         for i in range(max_retries):
             try:
+                add_log(f"Iniciando intento {i+1} con {model_name}...", "info")
                 response = model.generate_content(parts)
+                add_log(f"Respuesta recibida de {model_name}.", "success")
                 return response.text, None
             except Exception as e:
                 err_str = str(e)
+                add_log(f"Error en intento {i+1}: {err_str}", "warning")
                 if "429" in err_str:
-                    time.sleep((i + 1) * 5 + random.random())
+                    wait = (i + 1) * 5 + random.random()
+                    add_log(f"Esperando {wait:.2f}s por cuota...", "info")
+                    time.sleep(wait)
                     continue
                 if "400" in err_str and "expired" in err_str.lower():
-                    return None, "La clave de API ha expirado o es inválida. Por favor, genera una nueva en AI Studio y pégala en la barra lateral."
+                    return None, "La clave de API ha expirado."
                 return None, err_str
         return None, "Error persistente tras reintentos."
     except Exception as e:
+        add_log(f"Error crítico de motor: {str(e)}", "error")
         return None, f"Error de motor: {str(e)}"
 
 def auditar_par_archivo(pdf, img, model_choice):
-    """Audita un par de archivos individualmente"""
     prompt = """
     [ROL] Auditor Jefe de Datos Deportivos Pro.
     [TAREA] Compara la Fase 2 (Simulación) del PDF contra los resultados de la imagen real.
@@ -163,29 +189,41 @@ with tab1:
     
     if st.button("▶ INICIAR PROCESAMIENTO"):
         if not GEMINI_API_KEY:
-            st.error("Introduce una clave de API en la barra lateral para continuar.")
+            st.error("Introduce una clave de API en la barra lateral.")
         elif pdfs and imgs and len(pdfs) == len(imgs):
             with st.status("🚀 Analizando archivos...", expanded=True) as status:
                 for i in range(len(pdfs)):
-                    msg = f"Analizando Partido {i+1}: {pdfs[i].name}"
-                    st.markdown(f'<p class="loading-text">{msg}</p>', unsafe_allow_html=True)
+                    msg_ui = f"Analizando Partido {i+1}: {pdfs[i].name}"
+                    st.markdown(f'<p class="loading-text">{msg_ui}</p>', unsafe_allow_html=True)
                     
                     res_raw, err = auditar_par_archivo(pdfs[i], imgs[i], model_option)
                     
                     if err:
                         st.error(f"Fallo en {pdfs[i].name}: {err}")
+                        add_log(f"Error procesando {pdfs[i].name}: {err}", "error")
                         continue
                     
                     try:
                         data = json.loads(res_raw)
                         supabase.table("auditoria_apuestas").insert(data).execute()
                         st.success(f"✅ Guardado: {data.get('partido')}")
+                        add_log(f"Éxito en {data.get('partido')}. Guardado en DB.", "success")
                         time.sleep(2)
                     except Exception as e:
                         st.error(f"Error interpretando datos: {e}")
+                        add_log(f"Error JSON en {pdfs[i].name}: {str(e)}", "error")
                 status.update(label="✅ Todos los procesos terminados", state="complete")
         else:
             st.warning("Debes subir la misma cantidad de archivos e imágenes.")
+
+    # --- CONSOLA DE ERRORES ---
+    st.divider()
+    with st.expander("🛠️ Consola de Depuración Técnica", expanded=len(st.session_state.debug_logs) > 0):
+        if st.session_state.debug_logs:
+            log_content = "\n".join(st.session_state.debug_logs[::-1])
+            st.text_area("Logs de sistema", value=log_content, height=250, disabled=True)
+        else:
+            st.write("No hay eventos registrados.")
 
 # --- PESTAÑA 2: APUESTA MAESTRA ---
 with tab2:
@@ -201,6 +239,7 @@ with tab2:
             st.error("API Key requerida.")
         elif m_text and m_img:
             with st.status("🔍 Verificando selección final...", expanded=True):
+                add_log("Iniciando auditoría de Apuesta Maestra...", "info")
                 prompt = f"[ROL] Auditor Franco-Tirador. [PRONÓSTICO]: {m_text}. Verifica contra la imagen real y devuelve JSON con tipo: 'Maestra'."
                 partes = [prompt, {"mime_type": "image/png", "data": m_img.getvalue()}]
                 res_raw, err = call_gemini_with_retry(model_option, partes)
@@ -211,10 +250,13 @@ with tab2:
                         supabase.table("auditoria_apuestas").insert(data).execute()
                         st.balloons()
                         st.success("✅ Apuesta Maestra auditada y guardada.")
-                    except:
+                        add_log("Apuesta Maestra guardada con éxito.", "success")
+                    except Exception as e:
                         st.error("Error en formato de respuesta.")
+                        add_log(f"Error JSON Maestra: {str(e)}", "error")
                 else:
                     st.error(err)
+                    add_log(f"Fallo en Maestra: {err}", "error")
 
 # --- PESTAÑA 3: DASHBOARD ---
 with tab3:
@@ -237,6 +279,7 @@ with tab3:
         else:
             st.info("No hay datos en el historial.")
     except Exception as e:
-        st.error(f"Error de base de datos: {e}")
+        st.error(f"Error de base de datos.")
+        add_log(f"Error DB: {str(e)}", "error")
 
-st.sidebar.caption("Quant/Sharp v7.1 | Workflow Blindado")
+st.sidebar.caption("Quant/Sharp v7.2 | Consola Técnica Activa")
