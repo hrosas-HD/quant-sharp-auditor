@@ -13,7 +13,7 @@ import random
 # CONFIGURACIÓN DE PÁGINA
 # =====================================================================
 st.set_page_config(
-    page_title="Quant/Sharp Auditor Pro v7.0",
+    page_title="Quant/Sharp Auditor Pro v7.1",
     page_icon="🎯",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -63,14 +63,40 @@ st.markdown("""
 SUPABASE_URL = "https://tnxhmhoczcbfmhieaxgt.supabase.co"
 SUPABASE_KEY = "sb_publishable_4SX3y_184dNOObMxbRTIYA_3qSbfYUt"
 
-# PRIORIDAD DE CLAVE: Secrets de Streamlit -> Nueva Clave proporcionada
-GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY", "AIzaSyC66lmTl5kVQbsT954jEBkMcCfJczLohGc")
+# =====================================================================
+# BARRA LATERAL (CONFIGURACIÓN DE SEGURIDAD)
+# =====================================================================
+with st.sidebar:
+    st.header("⚙️ Configuración Crítica")
+    
+    # Entrada manual de clave para evitar el error "Expired" por filtración en código
+    manual_key = st.text_input("🔑 Gemini API Key (Manual):", type="password", help="Pega aquí tu nueva clave si la anterior expiró.")
+    
+    # Selección de modelo
+    model_option = st.selectbox(
+        "Motor de Inteligencia:",
+        ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-flash-latest"],
+        index=0
+    )
 
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-else:
-    st.error("⚠️ Falta la configuración de GEMINI_API_KEY.")
+    # Lógica de obtención de clave
+    GEMINI_API_KEY = manual_key if manual_key else st.secrets.get("GEMINI_API_KEY", "")
 
+    if GEMINI_API_KEY:
+        try:
+            genai.configure(api_key=GEMINI_API_KEY)
+            if st.button("🔍 Probar Validez de Clave"):
+                models = [m.name for m in genai.list_models()]
+                st.success("✅ Clave Activa y Funcional")
+        except Exception as e:
+            st.error(f"❌ Error de Clave: {e}")
+    else:
+        st.warning("⚠️ Sin clave configurada. Agrégala arriba o en los Secrets.")
+
+    st.divider()
+    st.caption("v7.1 | Sistema Anti-Expiración")
+
+# Inicialización de Supabase
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # =====================================================================
@@ -78,6 +104,9 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # =====================================================================
 def call_gemini_with_retry(model_name, parts, max_retries=3):
     """Llamada a Gemini con reintentos para manejar errores 429 y 404"""
+    if not GEMINI_API_KEY:
+        return None, "No hay API Key configurada."
+        
     try:
         model = genai.GenerativeModel(
             model_name=model_name,
@@ -90,20 +119,18 @@ def call_gemini_with_retry(model_name, parts, max_retries=3):
                 return response.text, None
             except Exception as e:
                 err_str = str(e)
-                # Error de Cuota (Límite de peticiones)
                 if "429" in err_str:
-                    time.sleep((i + 1) * 5 + random.randint(0, 1000) / 1000)
+                    time.sleep((i + 1) * 5 + random.random())
                     continue
-                # Error de Modelo no encontrado
-                if "404" in err_str:
-                    return None, f"El modelo '{model_name}' no existe en esta región/cuenta. Cambia el motor en la barra lateral."
+                if "400" in err_str and "expired" in err_str.lower():
+                    return None, "La clave de API ha expirado o es inválida. Por favor, genera una nueva en AI Studio y pégala en la barra lateral."
                 return None, err_str
-        return None, "Error de cuota tras reintentos."
+        return None, "Error persistente tras reintentos."
     except Exception as e:
         return None, f"Error de motor: {str(e)}"
 
 def auditar_par_archivo(pdf, img, model_choice):
-    """Audita un par de archivos individualmente para mayor precisión"""
+    """Audita un par de archivos individualmente"""
     prompt = """
     [ROL] Auditor Jefe de Datos Deportivos Pro.
     [TAREA] Compara la Fase 2 (Simulación) del PDF contra los resultados de la imagen real.
@@ -117,36 +144,16 @@ def auditar_par_archivo(pdf, img, model_choice):
     return call_gemini_with_retry(model_choice, partes)
 
 # =====================================================================
-# INTERFAZ DE USUARIO
+# INTERFAZ DE USUARIO PRINCIPAL
 # =====================================================================
 st.title("🎯 Quant/Sharp Auditor Pro")
-
-with st.sidebar:
-    st.header("⚙️ Configuración")
-    model_option = st.selectbox(
-        "Motor de Inteligencia:",
-        ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-flash-latest"],
-        index=0,
-        help="Si un modelo falla, prueba otro de la lista."
-    )
-    
-    if st.button("🔍 Probar Conexión API"):
-        try:
-            models = [m.name for m in genai.list_models()]
-            st.success("Conexión Exitosa")
-            st.write("Modelos disponibles en tu cuenta:", [m.split('/')[-1] for m in models])
-        except Exception as e:
-            st.error(f"Error de conexión: {e}")
-            
-    st.divider()
-    st.caption("v7.0 | New API Key Integration")
 
 tab1, tab2, tab3 = st.tabs(["📄 AUDITORÍA INDIVIDUAL (P1)", "🛡️ APUESTA MAESTRA (P2)", "📊 PANEL DE CONTROL"])
 
 # --- PESTAÑA 1: LOTES ---
 with tab1:
     st.subheader("Fase 1: Control de Calidad de Simulaciones")
-    st.info("Sube informes y capturas. El sistema los emparejará y analizará secuencialmente.")
+    st.info("Sube informes y capturas. Procesamiento secuencial para evitar errores de cuota.")
     
     c1, c2 = st.columns(2)
     with c1:
@@ -155,8 +162,10 @@ with tab1:
         imgs = st.file_uploader("Subir Imágenes", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
     
     if st.button("▶ INICIAR PROCESAMIENTO"):
-        if pdfs and imgs and len(pdfs) == len(imgs):
-            with st.status("🚀 Auditando...", expanded=True) as status:
+        if not GEMINI_API_KEY:
+            st.error("Introduce una clave de API en la barra lateral para continuar.")
+        elif pdfs and imgs and len(pdfs) == len(imgs):
+            with st.status("🚀 Analizando archivos...", expanded=True) as status:
                 for i in range(len(pdfs)):
                     msg = f"Analizando Partido {i+1}: {pdfs[i].name}"
                     st.markdown(f'<p class="loading-text">{msg}</p>', unsafe_allow_html=True)
@@ -171,7 +180,7 @@ with tab1:
                         data = json.loads(res_raw)
                         supabase.table("auditoria_apuestas").insert(data).execute()
                         st.success(f"✅ Guardado: {data.get('partido')}")
-                        time.sleep(2) # Pausa técnica para evitar bloqueos
+                        time.sleep(2)
                     except Exception as e:
                         st.error(f"Error interpretando datos: {e}")
                 status.update(label="✅ Todos los procesos terminados", state="complete")
@@ -188,7 +197,9 @@ with tab2:
         m_img = st.file_uploader("Estadísticas del Partido Maestro", type=["jpg", "png", "jpeg"], key="master_img")
     
     if st.button("▶ VALIDAR APUESTA MAESTRA"):
-        if m_text and m_img:
+        if not GEMINI_API_KEY:
+            st.error("API Key requerida.")
+        elif m_text and m_img:
             with st.status("🔍 Verificando selección final...", expanded=True):
                 prompt = f"[ROL] Auditor Franco-Tirador. [PRONÓSTICO]: {m_text}. Verifica contra la imagen real y devuelve JSON con tipo: 'Maestra'."
                 partes = [prompt, {"mime_type": "image/png", "data": m_img.getvalue()}]
@@ -228,4 +239,4 @@ with tab3:
     except Exception as e:
         st.error(f"Error de base de datos: {e}")
 
-st.sidebar.caption("Quant/Sharp v7.0 | Workflow Blindado")
+st.sidebar.caption("Quant/Sharp v7.1 | Workflow Blindado")
