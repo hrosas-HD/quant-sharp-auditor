@@ -276,6 +276,26 @@ except Exception as e:
     st.error(f"Error inicializando Supabase: {e}")
 
 # =====================================================================
+# FUNCIONES CALLBACK DE BASE DE DATOS (SOLUCIÓN A BOTONES EN BUCLES)
+# =====================================================================
+def db_delete_record(rec_id):
+    """Callback para eliminar un registro antes de que Streamlit recargue."""
+    if supabase:
+        try:
+            supabase.table("auditoria_apuestas").delete().eq("id", rec_id).execute()
+        except Exception as e:
+            print(f"Error al eliminar {rec_id}: {e}")
+
+def db_toggle_record(rec_id, current_status):
+    """Callback para forzar el cambio de estado (Override) antes de recargar."""
+    if supabase:
+        try:
+            nuevo_estado = "🔴 (Forzado)" if "🟢" in str(current_status) else "🟢 (Forzado)"
+            supabase.table("auditoria_apuestas").update({"estado": nuevo_estado}).eq("id", rec_id).execute()
+        except Exception as e:
+            print(f"Error al actualizar {rec_id}: {e}")
+
+# =====================================================================
 # BARRA LATERAL (CENTRO DE COMANDO)
 # =====================================================================
 with st.sidebar:
@@ -669,7 +689,7 @@ with t3:
                             full_json = json.loads(row['analisis_tecnico'])
                             data = full_json[0] if isinstance(full_json, list) else full_json
                             
-                            # SOLUCIÓN CRÍTICA: Casteo nativo a Int para asegurar compatibilidad de Supabase
+                            # Casteo nativo a Int
                             rec_id = int(row['id'])
 
                             is_maestra = (row['tipo'] == 'Maestra')
@@ -726,37 +746,19 @@ with t3:
                                     st.info(f"**Análisis de Desviación Técnica:** {data['analisis_tecnico']}")
                                     
                                 # ==========================================
-                                # ACCIONES: ELIMINAR O FORZAR (OVERRIDE)
+                                # ACCIONES MEDIANTE CALLBACKS DIRECTOS
                                 # ==========================================
                                 col_del, col_edit, _ = st.columns([1, 1.5, 3])
                                 with col_del:
-                                    if st.button("🗑️ Eliminar Registro", key=f"del_{rec_id}"):
-                                        try:
-                                            supabase.table("auditoria_apuestas").delete().eq("id", rec_id).execute()
-                                            st.rerun()
-                                        except Exception as e_del:
-                                            st.error(f"Fallo al eliminar en BD: {e_del}")
+                                    st.button("🗑️ Eliminar Registro", key=f"del_{rec_id}", on_click=db_delete_record, args=(rec_id,))
                                             
                                 with col_edit:
-                                    if st.button("✏️ Forzar Hit/Miss (Override)", key=f"edit_{rec_id}"):
-                                        try:
-                                            # Human in the loop: Cambia el resultado global si la IA se equivocó
-                                            nuevo_estado = "🔴 (Forzado)" if "🟢" in str(row['estado']) else "🟢 (Forzado)"
-                                            supabase.table("auditoria_apuestas").update({"estado": nuevo_estado}).eq("id", rec_id).execute()
-                                            st.rerun()
-                                        except Exception as e_edit:
-                                            st.error(f"Fallo al editar en BD: {e_edit}")
+                                    st.button("✏️ Forzar Hit/Miss (Override)", key=f"edit_{rec_id}", on_click=db_toggle_record, args=(rec_id, row['estado']))
                                         
                         except Exception as e:
                             st.error(f"Fila ID {row.get('id')} corrupta. Error: {e}")
-                            if st.button(f"Limpiar Registro #{row.get('id')}", key=f"fix_{row.get('id')}"):
-                                try:
-                                    rec_id_err = int(row['id']) if pd.notna(row['id']) else None
-                                    if rec_id_err is not None:
-                                        supabase.table("auditoria_apuestas").delete().eq("id", rec_id_err).execute()
-                                        st.rerun()
-                                except Exception as e_fix:
-                                    st.error(f"No se pudo limpiar. Error: {e_fix}")
+                            if st.button(f"Limpiar Registro #{row.get('id')}", key=f"fix_{row.get('id')}", on_click=db_delete_record, args=(int(row.get('id', 0)),)):
+                                pass
             else: 
                 st.info("Base de datos vacía.")
         else:
