@@ -417,7 +417,6 @@ def auditar_apuesta_maestra(texto_franco, imagenes, model_choice, status_placeho
         time.sleep(0.5)
         update_status_ui(status_placeholder, 3, "Validando mercados lógicamente...")
 
-        # NOTA: Se ha añadido el campo "stake_sugerido" a la extracción JSON.
         prompt = """
         Eres un auditor estadístico experto. Tu tarea es validar el rendimiento de un prompt de recomendación llamado 'Franco-Tirador'.
         Te entregaré el TEXTO con la 'Apuesta Maestra' y opcionalmente una 'Recomendación Secundaria'. También recibirás 1 o 2 IMÁGENES reales (capturas de Flashscore).
@@ -670,6 +669,9 @@ with t3:
                             full_json = json.loads(row['analisis_tecnico'])
                             data = full_json[0] if isinstance(full_json, list) else full_json
                             
+                            # SOLUCIÓN CRÍTICA: Casteo nativo a Int para asegurar compatibilidad de Supabase
+                            rec_id = int(row['id'])
+
                             is_maestra = (row['tipo'] == 'Maestra')
                             badge_maestra = "🛡️ " if is_maestra else "📄 "
                             expander_title = f"{row.get('estado', '⚪')} {badge_maestra}{row.get('partido', 'Unknown')} | {row['fecha'].strftime('%d/%m %H:%M')}"
@@ -728,21 +730,33 @@ with t3:
                                 # ==========================================
                                 col_del, col_edit, _ = st.columns([1, 1.5, 3])
                                 with col_del:
-                                    if st.button("🗑️ Eliminar Registro", key=f"del_{row['id']}"):
-                                        supabase.table("auditoria_apuestas").delete().eq("id", row['id']).execute()
-                                        st.rerun()
+                                    if st.button("🗑️ Eliminar Registro", key=f"del_{rec_id}"):
+                                        try:
+                                            supabase.table("auditoria_apuestas").delete().eq("id", rec_id).execute()
+                                            st.rerun()
+                                        except Exception as e_del:
+                                            st.error(f"Fallo al eliminar en BD: {e_del}")
+                                            
                                 with col_edit:
-                                    if st.button("✏️ Forzar Hit/Miss (Override)", key=f"edit_{row['id']}"):
-                                        # Human in the loop: Cambia el resultado global si la IA se equivocó leyendo la imagen
-                                        nuevo_estado = "🔴 (Forzado)" if "🟢" in str(row['estado']) else "🟢 (Forzado)"
-                                        supabase.table("auditoria_apuestas").update({"estado": nuevo_estado}).eq("id", row['id']).execute()
-                                        st.rerun()
+                                    if st.button("✏️ Forzar Hit/Miss (Override)", key=f"edit_{rec_id}"):
+                                        try:
+                                            # Human in the loop: Cambia el resultado global si la IA se equivocó
+                                            nuevo_estado = "🔴 (Forzado)" if "🟢" in str(row['estado']) else "🟢 (Forzado)"
+                                            supabase.table("auditoria_apuestas").update({"estado": nuevo_estado}).eq("id", rec_id).execute()
+                                            st.rerun()
+                                        except Exception as e_edit:
+                                            st.error(f"Fallo al editar en BD: {e_edit}")
                                         
                         except Exception as e:
                             st.error(f"Fila ID {row.get('id')} corrupta. Error: {e}")
                             if st.button(f"Limpiar Registro #{row.get('id')}", key=f"fix_{row.get('id')}"):
-                                supabase.table("auditoria_apuestas").delete().eq("id", row['id']).execute()
-                                st.rerun()
+                                try:
+                                    rec_id_err = int(row['id']) if pd.notna(row['id']) else None
+                                    if rec_id_err is not None:
+                                        supabase.table("auditoria_apuestas").delete().eq("id", rec_id_err).execute()
+                                        st.rerun()
+                                except Exception as e_fix:
+                                    st.error(f"No se pudo limpiar. Error: {e_fix}")
             else: 
                 st.info("Base de datos vacía.")
         else:
