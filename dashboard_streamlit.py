@@ -126,13 +126,13 @@ st.markdown("""
     }
 
     /* Botones Generales y Cajas de Texto */
-    .stButton button {
+    .stButton button, .stDownloadButton button {
         background-color: #0a0a0a !important;
         color: #00f0ff !important;
         border: 1px solid #1f1f1f !important;
         transition: all 0.3s ease !important;
     }
-    .stButton button:hover {
+    .stButton button:hover, .stDownloadButton button:hover {
         border-color: #00f0ff !important;
         box-shadow: 0 0 10px rgba(0, 240, 255, 0.2) !important;
         color: #ffffff !important;
@@ -417,6 +417,7 @@ def auditar_apuesta_maestra(texto_franco, imagenes, model_choice, status_placeho
         time.sleep(0.5)
         update_status_ui(status_placeholder, 3, "Validando mercados lógicamente...")
 
+        # NOTA: Se ha añadido el campo "stake_sugerido" a la extracción JSON.
         prompt = """
         Eres un auditor estadístico experto. Tu tarea es validar el rendimiento de un prompt de recomendación llamado 'Franco-Tirador'.
         Te entregaré el TEXTO con la 'Apuesta Maestra' y opcionalmente una 'Recomendación Secundaria'. También recibirás 1 o 2 IMÁGENES reales (capturas de Flashscore).
@@ -434,16 +435,18 @@ def auditar_apuesta_maestra(texto_franco, imagenes, model_choice, status_placeho
           "marcador_final": "Marcador extraído del Partido Maestro (ej. 0-1)",
           "estado": "🟢 (Si Maestra es Hit) o 🔴 (Si Maestra es Miss)",
           "accuracy_score": int,
+          "stake_sugerido": int, 
           "apuestas_detalle": [
             {"apuesta": "[🛡️ MAESTRA] Nombre de la apuesta", "hit": true o false},
-            {"apuesta": "[🚩 SECUNDARIA] Nombre de la apuesta", "hit": true o false} // Solo si existe en el texto
+            {"apuesta": "[🚩 SECUNDARIA] Nombre de la apuesta", "hit": true o false} 
           ],
           "comparativa_simulacion": [
             {"metrica": "Validación Maestra", "informe": "Lo que pedía la apuesta (ej. Under 2.5)", "real": "El dato de la imagen (ej. 1 gol total)", "acerto": true o false},
-            {"metrica": "Validación Secundaria", "informe": "...", "real": "...", "acerto": true o false} // Solo si existe
+            {"metrica": "Validación Secundaria", "informe": "...", "real": "...", "acerto": true o false} 
           ],
           "analisis_tecnico": "Breve explicación objetiva de por qué la apuesta maestra sobrevivió a la guillotina de los filtros (según el texto) y si el resultado validó o no esa tesis de seguridad."
         }
+        Asegúrate que stake_sugerido sea un número entero extraído del texto (ej. si dice 'Stake Sugerido: 4%', pon 4). Si no hay, pon 1.
         """
         
         partes = [prompt, f"TEXTO DEL PROMPT:\n{texto_franco}"]
@@ -499,7 +502,7 @@ with t1:
                             "pronostico": data.get('pronostico', 'N/A'),
                             "marcador_final": data.get('marcador_final', '?-?'),
                             "estado": data.get('estado', '⚪'),
-                            "tipo": "Individual", # Etiqueta Clave
+                            "tipo": "Individual", 
                             "analisis_tecnico": json.dumps(data)
                         }
                         if supabase:
@@ -530,7 +533,7 @@ with t2:
     
     col_text, col_img = st.columns([1.2, 1])
     with col_text:
-        texto_franco = st.text_area("📋 Pega el reporte del Franco-Tirador aquí:", height=250, placeholder="🛡️ LA APUESTA MAESTRA...\nChicago Fire vs. DC United — Menos de 2.5 Goles\n\n🚩 RECOMENDACIÓN SECUNDARIA...")
+        texto_franco = st.text_area("📋 Pega el reporte del Franco-Tirador aquí:", height=250, placeholder="🛡️ LA APUESTA MAESTRA...\nChicago Fire vs. DC United — Menos de 2.5 Goles\n\nStake Sugerido: 4%\n\n🚩 RECOMENDACIÓN SECUNDARIA...")
     
     with col_img:
         st.markdown("<br>", unsafe_allow_html=True)
@@ -555,7 +558,7 @@ with t2:
                             "pronostico": data_m.get('pronostico', 'N/A'),
                             "marcador_final": data_m.get('marcador_final', '?-?'),
                             "estado": data_m.get('estado', '⚪'),
-                            "tipo": "Maestra", # ¡ETIQUETA CLAVE PARA EL DASHBOARD!
+                            "tipo": "Maestra", 
                             "analisis_tecnico": json.dumps(data_m)
                         }
                         if supabase:
@@ -581,7 +584,6 @@ with t3:
         if st.button("🔄 Refrescar Tablero"):
             st.rerun()
     with col_filtros:
-        # NUEVO FILTRO DINÁMICO
         tipo_filtro = st.radio("Filtro de Análisis:", ["Todos", "Individuales", "Apuestas Maestras"], horizontal=True)
         
     try:
@@ -597,20 +599,71 @@ with t3:
                 elif tipo_filtro == "Apuestas Maestras":
                     df = df[df['tipo'] == 'Maestra']
                 
-                # RECALCULO DE MÉTRICAS SEGÚN EL FILTRO
-                m1, m2, m3 = st.columns(3)
+                # CÁLCULOS AVANZADOS (ACCURACY OVER TIME Y ROI)
+                m1, m2, m3, m4 = st.columns(4)
                 hits = len(df[df['estado'].astype(str).str.contains('🟢', na=False)])
                 total_rows = len(df)
                 
+                accuracy_list = []
+                roi_units = 0.0
+                
+                for _, r in df.iterrows():
+                    try:
+                        if not r['analisis_tecnico']:
+                            accuracy_list.append(0)
+                            continue
+                        
+                        d = json.loads(r['analisis_tecnico'])
+                        d = d[0] if isinstance(d, list) else d
+                        acc = d.get('accuracy_score', 0)
+                        accuracy_list.append(acc)
+                        
+                        # Cálculo del Simulador de Bankroll (Stake * Cuota Simulada 1.85)
+                        stake = d.get('stake_sugerido', 0)
+                        if '🟢' in str(r['estado']):
+                            roi_units += stake * 0.85 
+                        elif '🔴' in str(r['estado']):
+                            roi_units -= stake
+                            
+                    except:
+                        accuracy_list.append(0)
+                
+                df['Accuracy'] = accuracy_list
+                
+                # ACTUALIZAR MÉTRICAS LED
                 m1.metric(f"Informes ({tipo_filtro})", total_rows)
                 m2.metric("Tasa de Acierto Global", f"{(hits/total_rows*100 if total_rows>0 else 0):.1f}%")
-                m3.metric("Riesgo", "🛡️ Activo")
+                m3.metric("Riesgo / Variabilidad", "🛡️ Controlado")
+                
+                if tipo_filtro == "Apuestas Maestras":
+                    m4.metric("ROI Estimado (Unidades)", f"{roi_units:+.1f} U")
+                else:
+                    m4.metric("Tendencia General", "Activa")
                 
                 st.divider()
 
                 if total_rows == 0:
                     st.info(f"No hay registros que coincidan con el filtro '{tipo_filtro}'.")
                 else:
+                    # ==========================================
+                    # GRÁFICO DE TENDENCIAS Y EXPORTACIÓN CSV
+                    # ==========================================
+                    col_chart, col_csv = st.columns([4, 1])
+                    with col_chart:
+                        st.markdown("##### 📈 Tendencia de Rendimiento (Accuracy en el Tiempo)")
+                    with col_csv:
+                        # Limpiamos el JSON bruto del CSV para no saturar Excel
+                        csv_data = df.drop(columns=['analisis_tecnico']).to_csv(index=False).encode('utf-8')
+                        st.download_button("📥 Exportar CSV", data=csv_data, file_name=f"reporte_{tipo_filtro.lower()}.csv", mime="text/csv")
+                        
+                    chart_data = df[['fecha', 'Accuracy']].set_index('fecha').sort_index()
+                    st.area_chart(chart_data, color="#00f0ff")
+                    
+                    st.write("<br>", unsafe_allow_html=True)
+                    
+                    # ==========================================
+                    # EXPANDERS CON EDICIÓN HUMAN-IN-THE-LOOP
+                    # ==========================================
                     for _, row in df.iterrows():
                         try:
                             if not row['analisis_tecnico']: continue
@@ -623,11 +676,8 @@ with t3:
                             
                             with st.expander(expander_title, expanded=False):
                                 
-                                st.write(f"**Precisión Algorítmica (Accuracy):** {data.get('accuracy_score', 0)}% {'(Hit Maestro)' if is_maestra and data.get('accuracy_score',0)==100 else ''}")
+                                st.write(f"**Precisión Algorítmica (Accuracy):** {data.get('accuracy_score', 0)}% {'(Hit Maestro)' if is_maestra and '🟢' in str(row['estado']) else ''}")
                                 
-                                # ==========================================
-                                # BLOQUE 1: TARJETAS DE APUESTAS (BI CARDS)
-                                # ==========================================
                                 st.markdown("##### 🎯 Apuestas Estratégicas")
                                 apuestas = data.get('apuestas_detalle', [])
                                 
@@ -652,9 +702,6 @@ with t3:
                                 st.write("")
                                 st.write("") 
 
-                                # ==========================================
-                                # BLOQUE 2: TABLA DE KPIs (LOOKER STYLE)
-                                # ==========================================
                                 st.markdown("##### 📊 Desglose de Validación")
                                 
                                 html_table = "<div class='bi-table-container'><table class='bi-table'>"
@@ -672,17 +719,23 @@ with t3:
                                 html_table += "</table></div>"
                                 st.markdown(html_table, unsafe_allow_html=True)
                                 
-                                # ==========================================
-                                # RESUMEN Y ACCIONES
-                                # ==========================================
                                 if "analisis_tecnico" in data:
                                     st.write("")
                                     st.info(f"**Análisis de Desviación Técnica:** {data['analisis_tecnico']}")
                                     
-                                col_del, _ = st.columns([1, 5])
+                                # ==========================================
+                                # ACCIONES: ELIMINAR O FORZAR (OVERRIDE)
+                                # ==========================================
+                                col_del, col_edit, _ = st.columns([1, 1.5, 3])
                                 with col_del:
                                     if st.button("🗑️ Eliminar Registro", key=f"del_{row['id']}"):
                                         supabase.table("auditoria_apuestas").delete().eq("id", row['id']).execute()
+                                        st.rerun()
+                                with col_edit:
+                                    if st.button("✏️ Forzar Hit/Miss (Override)", key=f"edit_{row['id']}"):
+                                        # Human in the loop: Cambia el resultado global si la IA se equivocó leyendo la imagen
+                                        nuevo_estado = "🔴 (Forzado)" if "🟢" in str(row['estado']) else "🟢 (Forzado)"
+                                        supabase.table("auditoria_apuestas").update({"estado": nuevo_estado}).eq("id", row['id']).execute()
                                         st.rerun()
                                         
                         except Exception as e:
