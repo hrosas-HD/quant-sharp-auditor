@@ -24,32 +24,133 @@ if "exhausted_models" not in st.session_state:
 def add_log(msg, type="info"):
     st.session_state.debug_logs.append(f"[{time.strftime('%H:%M:%S')}] [{type.upper()}] {msg}")
 
-# --- ESTILOS CSS PREMIUM (Actualizado para BI Dashboard) ---
+# --- ESTILOS CSS PREMIUM (ESTILO CYBER-QUANT / HACKER) ---
 st.markdown("""
     <style>
-    .main { background-color: #0d1117; color: #c9d1d9; }
+    @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&family=Inter:wght@400;600;800&display=swap');
+
+    /* Fondos Globales y Tipografía */
+    [data-testid="stAppViewContainer"], .main { 
+        background-color: #050505; 
+        color: #e0e0e0; 
+        font-family: 'Inter', sans-serif;
+    }
+    [data-testid="stSidebar"] { 
+        background-color: #0a0a0a !important; 
+        border-right: 1px solid #1f1f1f; 
+    }
+    h1, h2, h3 { 
+        color: #ffffff !important; 
+        font-family: 'Fira Code', monospace !important; 
+    }
+    hr { border-color: #1f1f1f !important; }
+
+    /* Métricas Nativas de Streamlit tipo Panel LED */
+    [data-testid="stMetric"] {
+        background: #0a0a0a;
+        border: 1px solid #1f1f1f;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    [data-testid="stMetric"]:hover {
+        border-color: #00f0ff;
+        box-shadow: 0 0 15px rgba(0, 240, 255, 0.1);
+    }
+    [data-testid="stMetricValue"] {
+        font-family: 'Fira Code', monospace;
+        color: #00f0ff !important;
+        text-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+    }
+    [data-testid="stMetricLabel"] {
+        color: #8b949e !important;
+        font-weight: 600;
+        font-size: 0.95rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    /* Animación de Carga Cyber */
     .scanning-wrapper {
         display: flex; flex-direction: column; align-items: center; padding: 30px;
-        background: rgba(22, 27, 34, 0.8); border-radius: 15px; border: 1px solid #30363d; margin: 20px 0;
+        background: #0a0a0a; border-radius: 10px; border: 1px solid #1f1f1f; margin: 20px 0;
+        box-shadow: 0 0 20px rgba(0, 240, 255, 0.05);
     }
     .scan-line {
-        width: 100%; height: 3px; background: #58a6ff; box-shadow: 0 0 15px #58a6ff;
+        width: 100%; height: 2px; background: #00f0ff; box-shadow: 0 0 15px #00f0ff, 0 0 30px #00f0ff;
         position: relative; animation: scan 1.5s ease-in-out infinite;
     }
-    @keyframes scan { 0% { transform: translateY(0); opacity: 0.2; } 50% { transform: translateY(40px); opacity: 1; } 100% { transform: translateY(0); opacity: 0.2; } }
-    .loading-step { font-family: 'Courier New', monospace; color: #7ee787; margin-top: 20px; font-size: 1rem; }
+    @keyframes scan { 0% { transform: translateY(0); opacity: 0.3; } 50% { transform: translateY(40px); opacity: 1; } 100% { transform: translateY(0); opacity: 0.3; } }
+    .loading-step { font-family: 'Fira Code', monospace; color: #00f0ff; margin-top: 20px; font-size: 1rem; text-shadow: 0 0 5px rgba(0, 240, 255, 0.5); }
+    
+    /* Consola de Depuración Hacker */
     .console-box {
-        background: #010409; color: #7ee787; padding: 15px; border-radius: 8px; border: 1px solid #30363d;
-        font-family: 'Courier New', monospace; height: 180px; overflow-y: auto; font-size: 0.85rem;
+        background: #000000; color: #39ff14; padding: 15px; border-radius: 8px; border: 1px solid #113311;
+        font-family: 'Fira Code', monospace; height: 180px; overflow-y: auto; font-size: 0.85rem;
+        box-shadow: inset 0 0 15px rgba(57, 255, 20, 0.05);
+    }
+
+    /* Tarjetas Interactivas de Fase 3 */
+    .quant-card {
+        padding: 20px;
+        border-radius: 10px;
+        height: 100%;
+        transition: all 0.3s ease;
+        background-color: #0a0a0a;
+        border: 1px solid #1f1f1f;
+        position: relative;
+        overflow: hidden;
+    }
+    .quant-card::before {
+        content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; transition: all 0.3s ease;
+    }
+    .quant-card:hover {
+        transform: translateY(-5px);
     }
     
-    /* Estilos tabla BI */
-    .bi-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.95rem; }
-    .bi-table th { background-color: #161b22; color: #8b949e; padding: 12px; text-align: left; border-bottom: 1px solid #30363d; font-weight: 600; }
-    .bi-table td { padding: 12px; border-bottom: 1px solid #21262d; color: #c9d1d9; }
-    .bi-table tr:hover { background-color: #1c2128; }
-    .status-hit { color: #3fb950; font-weight: bold; background: rgba(63, 185, 80, 0.1); padding: 4px 8px; border-radius: 4px; }
-    .status-miss { color: #f85149; font-weight: bold; background: rgba(248, 81, 73, 0.1); padding: 4px 8px; border-radius: 4px; }
+    .card-hit { border-color: rgba(57, 255, 20, 0.2); }
+    .card-hit::before { background-color: #39ff14; box-shadow: 0 0 15px #39ff14; }
+    .card-hit:hover { box-shadow: 0 10px 20px rgba(57, 255, 20, 0.1); border-color: #39ff14; }
+    .card-hit .card-icon { color: #39ff14; text-shadow: 0 0 8px rgba(57, 255, 20, 0.4); }
+    
+    .card-miss { border-color: rgba(255, 0, 60, 0.2); }
+    .card-miss::before { background-color: #ff003c; box-shadow: 0 0 15px #ff003c; }
+    .card-miss:hover { box-shadow: 0 10px 20px rgba(255, 0, 60, 0.1); border-color: #ff003c; }
+    .card-miss .card-icon { color: #ff003c; text-shadow: 0 0 8px rgba(255, 0, 60, 0.4); }
+
+    .card-icon { font-family: 'Fira Code', monospace; font-weight: bold; font-size: 0.9rem; margin-bottom: 10px; letter-spacing: 1px; }
+    .card-title { font-size: 1.05rem; font-weight: 600; color: #ffffff; }
+
+    /* Tablas BI Cyber-Quant */
+    .bi-table-container {
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid #1f1f1f;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+    }
+    .bi-table { 
+        width: 100%; border-collapse: collapse; font-size: 0.95rem; background-color: #0a0a0a; 
+    }
+    .bi-table th { 
+        background-color: #111111; color: #00f0ff; padding: 15px; text-align: left; 
+        border-bottom: 1px solid #1f1f1f; font-family: 'Fira Code', monospace; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;
+    }
+    .bi-table td { padding: 12px 15px; border-bottom: 1px solid #151515; color: #c9d1d9; }
+    .bi-table tr:nth-child(even) { background-color: #0d0d0d; }
+    .bi-table tr:hover { background-color: #1a1a1a; }
+    
+    /* Badges LED Neón para Status de Tabla */
+    .status-badge {
+        font-family: 'Fira Code', monospace; font-size: 0.8rem; padding: 5px 10px; border-radius: 4px; font-weight: bold; display: inline-block; letter-spacing: 0.5px;
+    }
+    .status-hit { 
+        color: #39ff14; background: rgba(57, 255, 20, 0.1); border: 1px solid rgba(57, 255, 20, 0.3); box-shadow: 0 0 10px rgba(57, 255, 20, 0.15);
+    }
+    .status-miss { 
+        color: #ff003c; background: rgba(255, 0, 60, 0.1); border: 1px solid rgba(255, 0, 60, 0.3); box-shadow: 0 0 10px rgba(255, 0, 60, 0.15);
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -301,16 +402,17 @@ with t3:
                                 cols_apuestas = st.columns(len(apuestas))
                                 for idx, b in enumerate(apuestas):
                                     is_hit = b.get("hit", False)
-                                    color_bg = "rgba(63, 185, 80, 0.1)" if is_hit else "rgba(248, 81, 73, 0.1)"
-                                    color_border = "#3fb950" if is_hit else "#f85149"
-                                    icon = "✅ HIT" if is_hit else "❌ MISS"
+                                    
+                                    # Asignación de clases y variables visuales
+                                    card_class = "card-hit" if is_hit else "card-miss"
+                                    icon = "[ ✓ ] HIT VALIDADO" if is_hit else "[ ✗ ] MISS DETECTADO"
                                     txt_apuesta = b.get("apuesta", "Apuesta")
                                     
                                     # Tarjeta HTML/CSS Inyectada
                                     card_html = f"""
-                                    <div style="background-color: {color_bg}; border-left: 5px solid {color_border}; padding: 15px; border-radius: 8px; height: 100%;">
-                                        <div style="color: {color_border}; font-weight: bold; font-size: 0.9rem; margin-bottom: 5px;">{icon}</div>
-                                        <div style="font-size: 1.05rem; font-weight: 500;">{txt_apuesta}</div>
+                                    <div class="quant-card {card_class}">
+                                        <div class="card-icon">{icon}</div>
+                                        <div class="card-title">{txt_apuesta}</div>
                                     </div>
                                     """
                                     cols_apuestas[idx].markdown(card_html, unsafe_allow_html=True)
@@ -326,19 +428,19 @@ with t3:
                             st.markdown("##### 📊 Desglose de Simulaciones (Fase 2)")
                             
                             # Construcción de la tabla HTML
-                            html_table = "<table class='bi-table'>"
+                            html_table = "<div class='bi-table-container'><table class='bi-table'>"
                             html_table += "<tr><th>Métrica Analizada</th><th>Predicción (Informe)</th><th>Realidad (Imagen)</th><th>Status</th></tr>"
                             
                             for sim in data.get('comparativa_simulacion', []):
                                 acerto = sim.get('acerto', False)
-                                status_html = "<span class='status-hit'>✅ ACERTADO</span>" if acerto else "<span class='status-miss'>❌ FALLADO</span>"
+                                status_html = "<span class='status-badge status-hit'>[ ✓ ] MATCH</span>" if acerto else "<span class='status-badge status-miss'>[ ✗ ] FAIL</span>"
                                 metrica = sim.get('metrica', 'Métrica')
                                 informe = sim.get('informe', 'N/A')
                                 real = sim.get('real', 'N/A')
                                 
                                 html_table += f"<tr><td><b>{metrica}</b></td><td>{informe}</td><td>{real}</td><td>{status_html}</td></tr>"
                             
-                            html_table += "</table>"
+                            html_table += "</table></div>"
                             st.markdown(html_table, unsafe_allow_html=True)
                             
                             # ==========================================
@@ -346,7 +448,7 @@ with t3:
                             # ==========================================
                             if "analisis_tecnico" in data:
                                 st.write("")
-                                st.info(f"**Resumen Técnico IA:** {data['analisis_tecnico']}")
+                                st.info(f"**Análisis de Desviación Técnica:** {data['analisis_tecnico']}")
                                 
                             col_del, _ = st.columns([1, 5])
                             with col_del:
