@@ -29,47 +29,128 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&family=Inter:wght@400;600;800&display=swap');
 
-    /* Fondos Globales y Tipografía */
-    [data-testid="stAppViewContainer"], .main { 
-        background-color: #050505; 
-        color: #e0e0e0; 
-        font-family: 'Inter', sans-serif;
+    /* =======================================================
+       1. FONDOS GLOBALES Y TIPOGRAFÍA
+       ======================================================= */
+    .stApp, [data-testid="stAppViewContainer"], .main { 
+        background-color: #050505 !important; 
+        color: #e0e0e0 !important; 
+        font-family: 'Inter', sans-serif !important;
     }
     [data-testid="stSidebar"] { 
         background-color: #0a0a0a !important; 
-        border-right: 1px solid #1f1f1f; 
+        border-right: 1px solid #1f1f1f !important; 
     }
-    h1, h2, h3 { 
+    h1, h2, h3, h4, h5, h6, p, span { 
         color: #ffffff !important; 
-        font-family: 'Fira Code', monospace !important; 
+    }
+    h1, h2, h3 {
+        font-family: 'Fira Code', monospace !important;
     }
     hr { border-color: #1f1f1f !important; }
 
+    /* =======================================================
+       2. CORRECCIÓN DE ELEMENTOS NATIVOS DE STREAMLIT (ADIÓS BLANCOS)
+       ======================================================= */
+    
+    /* Expanders (Acordeones de Auditoría) */
+    [data-testid="stExpander"] {
+        background-color: #0a0a0a !important;
+        border: 1px solid #1f1f1f !important;
+        border-radius: 8px !important;
+        overflow: hidden !important;
+    }
+    [data-testid="stExpander"] details summary {
+        background-color: #111111 !important;
+        color: #00f0ff !important;
+    }
+    [data-testid="stExpander"] details summary:hover {
+        background-color: #1a1a1a !important;
+        color: #39ff14 !important;
+    }
+    [data-testid="stExpander"] div[role="button"] p {
+        color: #00f0ff !important;
+        font-family: 'Fira Code', monospace !important;
+    }
+
+    /* Subidor de Archivos (File Uploader) */
+    [data-testid="stFileUploader"] > section {
+        background-color: #0a0a0a !important;
+        border: 1px dashed #1f1f1f !important;
+        color: #8b949e !important;
+    }
+    [data-testid="stFileUploader"] > section:hover {
+        border-color: #00f0ff !important;
+        background-color: #111111 !important;
+    }
+    [data-testid="stFileUploaderDropzoneInstructions"] > div > span {
+        color: #8b949e !important;
+    }
+
+    /* Pestañas (Tabs) */
+    [data-testid="stTabs"] button[data-baseweb="tab"] {
+        background-color: transparent !important;
+        color: #8b949e !important;
+        border-bottom-color: #1f1f1f !important;
+    }
+    [data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"] {
+        color: #00f0ff !important;
+        background-color: #0a0a0a !important;
+        border-bottom-color: #00f0ff !important;
+    }
+
+    /* Botones Generales y Cajas de Texto */
+    .stButton button {
+        background-color: #0a0a0a !important;
+        color: #00f0ff !important;
+        border: 1px solid #1f1f1f !important;
+        transition: all 0.3s ease !important;
+    }
+    .stButton button:hover {
+        border-color: #00f0ff !important;
+        box-shadow: 0 0 10px rgba(0, 240, 255, 0.2) !important;
+        color: #ffffff !important;
+    }
+    .stTextInput input, .stSelectbox div[data-baseweb="select"] {
+        background-color: #0a0a0a !important;
+        color: #00f0ff !important;
+        border: 1px solid #1f1f1f !important;
+    }
+    .stAlert {
+        background-color: #0a0a0a !important;
+        border: 1px solid #1f1f1f !important;
+        color: #e0e0e0 !important;
+    }
+
+    /* =======================================================
+       3. MÉTRICAS, ANIMACIONES Y TARJETAS BI CUSTOM
+       ======================================================= */
+
     /* Métricas Nativas de Streamlit tipo Panel LED */
     [data-testid="stMetric"] {
-        background: #0a0a0a;
-        border: 1px solid #1f1f1f;
-        padding: 15px;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.5);
-        text-align: center;
-        transition: all 0.3s ease;
+        background: #0a0a0a !important;
+        border: 1px solid #1f1f1f !important;
+        padding: 15px !important;
+        border-radius: 8px !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.5) !important;
+        text-align: center !important;
+        transition: all 0.3s ease !important;
     }
     [data-testid="stMetric"]:hover {
-        border-color: #00f0ff;
-        box-shadow: 0 0 15px rgba(0, 240, 255, 0.1);
+        border-color: #00f0ff !important;
+        box-shadow: 0 0 15px rgba(0, 240, 255, 0.1) !important;
     }
     [data-testid="stMetricValue"] {
-        font-family: 'Fira Code', monospace;
+        font-family: 'Fira Code', monospace !important;
         color: #00f0ff !important;
-        text-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+        text-shadow: 0 0 10px rgba(0, 240, 255, 0.4) !important;
     }
     [data-testid="stMetricLabel"] {
         color: #8b949e !important;
-        font-weight: 600;
-        font-size: 0.95rem;
-        text-transform: uppercase;
-        letter-spacing: 1px;
+        font-weight: 600 !important;
+        font-size: 0.95rem !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
     }
 
     /* Animación de Carga Cyber */
