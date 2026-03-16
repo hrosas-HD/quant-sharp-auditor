@@ -50,7 +50,26 @@ st.markdown("""
     hr { border-color: #1f1f1f !important; }
 
     /* =======================================================
-       2. CORRECCIÓN DE ELEMENTOS NATIVOS DE STREAMLIT (ADIÓS BLANCOS)
+       2. SCROLLBARS CIBERNÉTICOS (Personalización de barra)
+       ======================================================= */
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+        background: #050505; 
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #1f1f1f; 
+        border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: #00f0ff; 
+        box-shadow: 0 0 10px #00f0ff;
+    }
+
+    /* =======================================================
+       3. CORRECCIÓN DE ELEMENTOS NATIVOS DE STREAMLIT
        ======================================================= */
     
     /* Expanders (Acordeones de Auditoría) */
@@ -87,7 +106,7 @@ st.markdown("""
         color: #8b949e !important;
     }
 
-    /* Pestañas (Tabs) */
+    /* Pestañas (Tabs) con Resplandor (Glow) */
     [data-testid="stTabs"] button[data-baseweb="tab"] {
         background-color: transparent !important;
         color: #8b949e !important;
@@ -96,7 +115,8 @@ st.markdown("""
     [data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"] {
         color: #00f0ff !important;
         background-color: #0a0a0a !important;
-        border-bottom-color: #00f0ff !important;
+        border-bottom: 2px solid #00f0ff !important;
+        box-shadow: inset 0 -4px 10px rgba(0, 240, 255, 0.1) !important;
     }
 
     /* Botones Generales y Cajas de Texto */
@@ -123,7 +143,7 @@ st.markdown("""
     }
 
     /* =======================================================
-       3. MÉTRICAS, ANIMACIONES Y TARJETAS BI CUSTOM
+       4. MÉTRICAS, ANIMACIONES Y TARJETAS BI CUSTOM
        ======================================================= */
 
     /* Métricas Nativas de Streamlit tipo Panel LED */
