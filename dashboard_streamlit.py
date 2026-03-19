@@ -24,243 +24,245 @@ if "exhausted_models" not in st.session_state:
 def add_log(msg, type="info"):
     st.session_state.debug_logs.append(f"[{time.strftime('%H:%M:%S')}] [{type.upper()}] {msg}")
 
-# --- ESTILOS CSS PREMIUM (ESTILO CYBER-QUANT / HACKER) ---
+# --- ESTILOS CSS PREMIUM (ESTILO FINTECH / APPLE MODERNA) ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&family=Inter:wght@400;600;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
     /* =======================================================
-       1. FONDOS GLOBALES Y TIPOGRAFÍA
+       1. FONDOS GLOBALES Y TIPOGRAFÍA (Estilo Apple Dark)
        ======================================================= */
     .stApp, [data-testid="stAppViewContainer"], .main { 
-        background-color: #050505 !important; 
-        color: #e0e0e0 !important; 
-        font-family: 'Inter', sans-serif !important;
+        background-color: #121212 !important; 
+        color: #f5f5f7 !important; 
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
     }
     [data-testid="stSidebar"] { 
-        background-color: #0a0a0a !important; 
-        border-right: 1px solid #1f1f1f !important; 
+        background-color: #1c1c1e !important; 
+        border-right: 1px solid rgba(255, 255, 255, 0.05) !important; 
     }
-    h1, h2, h3, h4, h5, h6, p, span { 
-        color: #ffffff !important; 
+    h1, h2, h3, h4, h5, h6, p, span, div { 
+        color: #f5f5f7 !important; 
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
     }
-    h1, h2, h3 {
-        font-family: 'Fira Code', monospace !important;
-    }
-    hr { border-color: #1f1f1f !important; }
+    hr { border-color: rgba(255, 255, 255, 0.1) !important; }
 
     /* =======================================================
-       2. SCROLLBARS CIBERNÉTICOS (Personalización de barra)
+       2. SCROLLBARS ELEGANTES
        ======================================================= */
     ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
     }
     ::-webkit-scrollbar-track {
-        background: #050505; 
+        background: transparent; 
     }
     ::-webkit-scrollbar-thumb {
-        background: #1f1f1f; 
-        border-radius: 4px;
+        background: #3a3a3c; 
+        border-radius: 10px;
     }
     ::-webkit-scrollbar-thumb:hover {
-        background: #00f0ff; 
-        box-shadow: 0 0 10px #00f0ff;
+        background: #48484a; 
     }
 
     /* =======================================================
-       3. CORRECCIÓN DE ELEMENTOS NATIVOS DE STREAMLIT
+       3. CORRECCIÓN DE ELEMENTOS NATIVOS (GLASSMORPHISM SUTIL)
        ======================================================= */
     
     /* Expanders (Acordeones de Auditoría) */
     [data-testid="stExpander"] {
-        background-color: #0a0a0a !important;
-        border: 1px solid #1f1f1f !important;
-        border-radius: 8px !important;
+        background-color: #1c1c1e !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 12px !important;
         overflow: hidden !important;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
     }
     [data-testid="stExpander"] details summary {
-        background-color: #111111 !important;
-        color: #00f0ff !important;
+        background-color: transparent !important;
+        color: #f5f5f7 !important;
+        padding: 0.5rem !important;
     }
     [data-testid="stExpander"] details summary:hover {
-        background-color: #1a1a1a !important;
-        color: #39ff14 !important;
-    }
-    [data-testid="stExpander"] div[role="button"] p {
-        color: #00f0ff !important;
-        font-family: 'Fira Code', monospace !important;
+        background-color: rgba(255, 255, 255, 0.02) !important;
     }
 
     /* Subidor de Archivos y Text Area */
     [data-testid="stFileUploader"] > section {
-        background-color: #0a0a0a !important;
-        border: 1px dashed #1f1f1f !important;
-        color: #8b949e !important;
+        background-color: #1c1c1e !important;
+        border: 1px dashed rgba(255, 255, 255, 0.2) !important;
+        border-radius: 12px !important;
+        color: #86868b !important;
     }
     [data-testid="stFileUploader"] > section:hover {
-        border-color: #00f0ff !important;
-        background-color: #111111 !important;
+        border-color: #2997ff !important;
+        background-color: rgba(41, 151, 255, 0.05) !important;
     }
     [data-testid="stFileUploaderDropzoneInstructions"] > div > span {
-        color: #8b949e !important;
+        color: #86868b !important;
     }
     .stTextArea textarea {
-        background-color: #0a0a0a !important;
-        color: #00f0ff !important;
-        border: 1px solid #1f1f1f !important;
-        font-family: 'Fira Code', monospace !important;
+        background-color: #1c1c1e !important;
+        color: #f5f5f7 !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 10px !important;
     }
 
-    /* Pestañas (Tabs) con Resplandor (Glow) */
+    /* Pestañas (Tabs) Minimalistas */
     [data-testid="stTabs"] button[data-baseweb="tab"] {
         background-color: transparent !important;
-        color: #8b949e !important;
-        border-bottom-color: #1f1f1f !important;
+        color: #86868b !important;
+        border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+        font-weight: 500 !important;
     }
     [data-testid="stTabs"] button[data-baseweb="tab"][aria-selected="true"] {
-        color: #00f0ff !important;
-        background-color: #0a0a0a !important;
-        border-bottom: 2px solid #00f0ff !important;
-        box-shadow: inset 0 -4px 10px rgba(0, 240, 255, 0.1) !important;
+        color: #f5f5f7 !important;
+        background-color: transparent !important;
+        border-bottom: 2px solid #2997ff !important;
     }
 
     /* Botones Generales y Cajas de Texto */
     .stButton button, .stDownloadButton button {
-        background-color: #0a0a0a !important;
-        color: #00f0ff !important;
-        border: 1px solid #1f1f1f !important;
-        transition: all 0.3s ease !important;
+        background-color: #2c2c2e !important;
+        color: #2997ff !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 10px !important;
+        font-weight: 600 !important;
+        transition: all 0.2s ease !important;
     }
     .stButton button:hover, .stDownloadButton button:hover {
-        border-color: #00f0ff !important;
-        box-shadow: 0 0 10px rgba(0, 240, 255, 0.2) !important;
-        color: #ffffff !important;
+        background-color: #3a3a3c !important;
+        border-color: #2997ff !important;
+        box-shadow: 0 4px 12px rgba(41, 151, 255, 0.15) !important;
+        color: #2997ff !important;
     }
     .stTextInput input, .stSelectbox div[data-baseweb="select"] {
-        background-color: #0a0a0a !important;
-        color: #00f0ff !important;
-        border: 1px solid #1f1f1f !important;
+        background-color: #1c1c1e !important;
+        color: #f5f5f7 !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 10px !important;
     }
     .stAlert {
-        background-color: #0a0a0a !important;
-        border: 1px solid #1f1f1f !important;
-        color: #e0e0e0 !important;
+        background-color: #1c1c1e !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        border-radius: 12px !important;
+        color: #f5f5f7 !important;
     }
     /* Radio Buttons Filtros */
     div[role="radiogroup"] label {
-        color: #00f0ff !important;
+        color: #f5f5f7 !important;
     }
 
     /* =======================================================
        4. MÉTRICAS, ANIMACIONES Y TARJETAS BI CUSTOM
        ======================================================= */
 
-    /* Métricas Nativas de Streamlit tipo Panel LED */
+    /* Métricas Nativas de Streamlit */
     [data-testid="stMetric"] {
-        background: #0a0a0a !important;
-        border: 1px solid #1f1f1f !important;
-        padding: 15px !important;
-        border-radius: 8px !important;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.5) !important;
+        background: #1c1c1e !important;
+        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        padding: 20px !important;
+        border-radius: 16px !important;
+        box-shadow: 0 4px 14px rgba(0,0,0,0.1) !important;
         text-align: center !important;
         transition: all 0.3s ease !important;
     }
     [data-testid="stMetric"]:hover {
-        border-color: #00f0ff !important;
-        box-shadow: 0 0 15px rgba(0, 240, 255, 0.1) !important;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15) !important;
     }
     [data-testid="stMetricValue"] {
-        font-family: 'Fira Code', monospace !important;
-        color: #00f0ff !important;
-        text-shadow: 0 0 10px rgba(0, 240, 255, 0.4) !important;
+        color: #f5f5f7 !important;
+        font-weight: 700 !important;
+        font-size: 2rem !important;
     }
     [data-testid="stMetricLabel"] {
-        color: #8b949e !important;
-        font-weight: 600 !important;
-        font-size: 0.95rem !important;
+        color: #86868b !important;
+        font-weight: 500 !important;
+        font-size: 0.9rem !important;
         text-transform: uppercase !important;
         letter-spacing: 1px !important;
     }
 
-    /* Animación de Carga Cyber */
+    /* Animación de Carga Limpia */
     .scanning-wrapper {
-        display: flex; flex-direction: column; align-items: center; padding: 30px;
-        background: #0a0a0a; border-radius: 10px; border: 1px solid #1f1f1f; margin: 20px 0;
-        box-shadow: 0 0 20px rgba(0, 240, 255, 0.05);
+        display: flex; flex-direction: column; align-items: center; padding: 40px;
+        background: #1c1c1e; border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.05); margin: 20px 0;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
     }
     .scan-line {
-        width: 100%; height: 2px; background: #00f0ff; box-shadow: 0 0 15px #00f0ff, 0 0 30px #00f0ff;
-        position: relative; animation: scan 1.5s ease-in-out infinite;
+        width: 100%; height: 4px; border-radius: 2px;
+        background: linear-gradient(90deg, transparent, #2997ff, transparent);
+        position: relative; animation: scan 2s ease-in-out infinite;
     }
-    @keyframes scan { 0% { transform: translateY(0); opacity: 0.3; } 50% { transform: translateY(40px); opacity: 1; } 100% { transform: translateY(0); opacity: 0.3; } }
-    .loading-step { font-family: 'Fira Code', monospace; color: #00f0ff; margin-top: 20px; font-size: 1rem; text-shadow: 0 0 5px rgba(0, 240, 255, 0.5); }
+    @keyframes scan { 0% { transform: translateY(-20px); opacity: 0; } 50% { transform: translateY(20px); opacity: 1; } 100% { transform: translateY(-20px); opacity: 0; } }
+    .loading-step { color: #2997ff; margin-top: 25px; font-size: 1rem; font-weight: 500; }
     
-    /* Consola de Depuración Hacker */
+    /* Consola de Depuración Soft */
     .console-box {
-        background: #000000; color: #39ff14; padding: 15px; border-radius: 8px; border: 1px solid #113311;
-        font-family: 'Fira Code', monospace; height: 180px; overflow-y: auto; font-size: 0.85rem;
-        box-shadow: inset 0 0 15px rgba(57, 255, 20, 0.05);
+        background: #121212; color: #86868b; padding: 20px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05);
+        font-family: monospace; height: 180px; overflow-y: auto; font-size: 0.85rem;
     }
 
     /* Tarjetas Interactivas de Fase 3 */
     .quant-card {
-        padding: 20px;
-        border-radius: 10px;
+        padding: 24px;
+        border-radius: 16px;
         height: 100%;
-        transition: all 0.3s ease;
-        background-color: #0a0a0a;
-        border: 1px solid #1f1f1f;
+        transition: all 0.2s ease;
+        background-color: #1c1c1e;
+        border: 1px solid rgba(255, 255, 255, 0.05);
         position: relative;
         overflow: hidden;
-    }
-    .quant-card::before {
-        content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; transition: all 0.3s ease;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
     }
     .quant-card:hover {
-        transform: translateY(-5px);
+        transform: scale(1.02);
+        box-shadow: 0 8px 20px rgba(0,0,0,0.2);
     }
     
-    .card-hit { border-color: rgba(57, 255, 20, 0.2); }
-    .card-hit::before { background-color: #39ff14; box-shadow: 0 0 15px #39ff14; }
-    .card-hit:hover { box-shadow: 0 10px 20px rgba(57, 255, 20, 0.1); border-color: #39ff14; }
-    .card-hit .card-icon { color: #39ff14; text-shadow: 0 0 8px rgba(57, 255, 20, 0.4); }
+    .card-hit { 
+        background: linear-gradient(145deg, #1c1c1e, rgba(52, 199, 89, 0.05)); 
+        border-left: 4px solid #34c759; 
+    }
+    .card-hit .card-icon { color: #34c759; }
     
-    .card-miss { border-color: rgba(255, 0, 60, 0.2); }
-    .card-miss::before { background-color: #ff003c; box-shadow: 0 0 15px #ff003c; }
-    .card-miss:hover { box-shadow: 0 10px 20px rgba(255, 0, 60, 0.1); border-color: #ff003c; }
-    .card-miss .card-icon { color: #ff003c; text-shadow: 0 0 8px rgba(255, 0, 60, 0.4); }
+    .card-miss { 
+        background: linear-gradient(145deg, #1c1c1e, rgba(255, 59, 48, 0.05)); 
+        border-left: 4px solid #ff3b30; 
+    }
+    .card-miss .card-icon { color: #ff3b30; }
 
-    .card-icon { font-family: 'Fira Code', monospace; font-weight: bold; font-size: 0.9rem; margin-bottom: 10px; letter-spacing: 1px; }
-    .card-title { font-size: 1.05rem; font-weight: 600; color: #ffffff; }
+    .card-icon { font-weight: 600; font-size: 0.85rem; margin-bottom: 12px; letter-spacing: 0.5px; }
+    .card-title { font-size: 1.1rem; font-weight: 600; color: #f5f5f7; }
 
-    /* Tablas BI Cyber-Quant */
+    /* Tablas BI Elegantes */
     .bi-table-container {
-        border-radius: 10px;
+        border-radius: 16px;
         overflow: hidden;
-        border: 1px solid #1f1f1f;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        background-color: #1c1c1e;
     }
     .bi-table { 
-        width: 100%; border-collapse: collapse; font-size: 0.95rem; background-color: #0a0a0a; 
+        width: 100%; border-collapse: collapse; font-size: 0.95rem; 
     }
     .bi-table th { 
-        background-color: #111111; color: #00f0ff; padding: 15px; text-align: left; 
-        border-bottom: 1px solid #1f1f1f; font-family: 'Fira Code', monospace; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;
+        background-color: rgba(255, 255, 255, 0.02); color: #86868b; padding: 16px; text-align: left; 
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08); font-weight: 500; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 1px;
     }
-    .bi-table td { padding: 12px 15px; border-bottom: 1px solid #151515; color: #c9d1d9; }
-    .bi-table tr:nth-child(even) { background-color: #0d0d0d; }
-    .bi-table tr:hover { background-color: #1a1a1a; }
+    .bi-table td { padding: 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); color: #e0e0e0; }
+    .bi-table tr:last-child td { border-bottom: none; }
+    .bi-table tr:hover { background-color: rgba(255, 255, 255, 0.02); }
     
-    /* Badges LED Neón para Status de Tabla */
+    /* Badges Status Apple Style (Píldoras) */
     .status-badge {
-        font-family: 'Fira Code', monospace; font-size: 0.8rem; padding: 5px 10px; border-radius: 4px; font-weight: bold; display: inline-block; letter-spacing: 0.5px;
+        font-size: 0.8rem; padding: 6px 12px; border-radius: 20px; font-weight: 600; display: inline-block; letter-spacing: 0.5px;
     }
     .status-hit { 
-        color: #39ff14; background: rgba(57, 255, 20, 0.1); border: 1px solid rgba(57, 255, 20, 0.3); box-shadow: 0 0 10px rgba(57, 255, 20, 0.15);
+        color: #34c759; background: rgba(52, 199, 89, 0.15); 
     }
     .status-miss { 
-        color: #ff003c; background: rgba(255, 0, 60, 0.1); border: 1px solid rgba(255, 0, 60, 0.3); box-shadow: 0 0 10px rgba(255, 0, 60, 0.15);
+        color: #ff3b30; background: rgba(255, 59, 48, 0.15); 
     }
     </style>
     """, unsafe_allow_html=True)
@@ -339,7 +341,7 @@ with st.sidebar:
 # =====================================================================
 
 def update_status_ui(placeholder, step_num, text, wait_secs=0):
-    timer = f'<div style="color:#f85149">⏳ REINTENTO EN: {wait_secs}s</div>' if wait_secs > 0 else ""
+    timer = f'<div style="color:#ff3b30">⏳ REINTENTO EN: {wait_secs}s</div>' if wait_secs > 0 else ""
     placeholder.markdown(f"""
         <div class="scanning-wrapper">
             <div class="scan-line"></div>
@@ -676,7 +678,7 @@ with t3:
                         st.download_button("📥 Exportar CSV", data=csv_data, file_name=f"reporte_{tipo_filtro.lower()}.csv", mime="text/csv")
                         
                     chart_data = df[['fecha', 'Accuracy']].set_index('fecha').sort_index()
-                    st.area_chart(chart_data, color="#00f0ff")
+                    st.area_chart(chart_data, color="#2997ff")
                     
                     st.write("<br>", unsafe_allow_html=True)
                     
